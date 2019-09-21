@@ -42,6 +42,8 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <poll.h>
+#else
+#include <WinSock2.h>
 #endif
 #include <sys/types.h>
 #include <time.h>

@@ -14,8 +14,8 @@
  */
 
 typedef struct _stx_clist {
-  struct _stx_clist *next;
-  struct _stx_clist *prev;
+    struct _stx_clist* next;
+    struct _stx_clist* prev;
 } stx_clist_t;
 
 /* Insert element "_e" into the list, before "_l" */

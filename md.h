@@ -1,30 +1,30 @@
-/* 
+/*
  * The contents of this file are subject to the Mozilla Public
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
  * the License at http://www.mozilla.org/MPL/
- * 
+ *
  * Software distributed under the License is distributed on an "AS
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- * 
+ *
  * The Original Code is the Netscape Portable Runtime library.
- * 
+ *
  * The Initial Developer of the Original Code is Netscape
- * Communications Corporation.  Portions created by Netscape are 
+ * Communications Corporation.  Portions created by Netscape are
  * Copyright (C) 1994-2000 Netscape Communications Corporation.  All
  * Rights Reserved.
- * 
+ *
  * Contributor(s):  Silicon Graphics, Inc.
- * 
+ *
  * Portions created by SGI are Copyright (C) 2000-2001 Silicon
  * Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * Alternatively, the contents of this file may be used under the
  * terms of the GNU General Public License Version 2 or later (the
- * "GPL"), in which case the provisions of the GPL are applicable 
- * instead of those above.  If you wish to allow use of your 
+ * "GPL"), in which case the provisions of the GPL are applicable
+ * instead of those above.  If you wish to allow use of your
  * version of this file only under the terms of the GPL and not to
  * allow others to use your version of this file under the MPL,
  * indicate your decision by deleting the provisions above and
@@ -111,6 +111,50 @@
   struct timeval tv;              \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
+
+#elif defined (WIN32)
+#include <setjmp.h>
+#include <sys/timeb.h>
+
+int getpagesize(void);
+int _st_GetError(int err);
+
+#if FD_SETSIZE < 200
+#undef FD_SETSIZE
+#define FD_SETSIZE 200
+#endif
+
+#define MD_DONT_HAVE_POLL
+#define MALLOC_STACK
+#define MD_STACK_GROWS_DOWN
+#define MD_ACCEPT_NB_NOT_INHERITED
+#define MD_ALWAYS_UNSERIALIZED_ACCEPT
+
+#define MD_SETJMP(env) setjmp(env)
+#define MD_LONGJMP(env, val) longjmp(env, val)
+
+#ifndef _M_X64
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
+  (_thread)->context[4] = (long)_sp; \
+  ST_END_MACRO
+
+#else
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
+  (_thread)->context[4].Part[0] = (long)_sp; \
+  ST_END_MACRO
+
+#endif
+
+#define MD_GET_UTIME() \
+  struct _timeb tb; \
+  _ftime(&tb); \
+  return((tb.time*1000000)+(tb.millitm*1000));
 
 #elif defined (DARWIN)
 
@@ -353,7 +397,7 @@
 #ifndef JB_GPR1
 #define JB_GPR1 0
 #endif
-#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_GPR1]   
+#define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_GPR1]
 #else
 /* not an error but certainly cause for caution */
 #error "Untested use of old glibc on powerpc"
