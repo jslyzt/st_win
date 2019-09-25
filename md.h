@@ -12,39 +12,9 @@
 #define MAP_FAILED -1
 #endif
 
-/*****************************************
- * Platform specifics
- *****************************************/
+// Platform specifics
 
-#if defined (AIX)
-
-#define MD_STACK_GROWS_DOWN
-#define MD_USE_SYSV_ANON_MMAP
-#define MD_ACCEPT_NB_INHERITED
-#define MD_ALWAYS_UNSERIALIZED_ACCEPT
-
-#ifndef MD_HAVE_SOCKLEN_T
-#define MD_HAVE_SOCKLEN_T
-#define socklen_t unsigned long
-#endif
-
-#define MD_SETJMP(env) _setjmp(env)
-#define MD_LONGJMP(env, val) _longjmp(env, val)
-
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  (_thread)->context[3] = (long) (_sp); \
-  ST_END_MACRO
-
-#define MD_GET_UTIME() \
-  timebasestruct_t rt; \
-  (void) read_real_time(&rt, TIMEBASE_SZ); \
-  (void) time_base_to_time(&rt, TIMEBASE_SZ); \
-  return (rt.tb_high * 1000000LL + rt.tb_low / 1000)
-
-#elif defined (CYGWIN)
+#if defined (CYGWIN)
 
 #define MD_STACK_GROWS_DOWN
 #define MD_USE_BSD_ANON_MMAP
@@ -54,8 +24,7 @@
 #define MD_SETJMP(env) setjmp(env)
 #define MD_LONGJMP(env, val) longjmp(env, val)
 
-#define MD_JB_SP  7
-
+#define MD_JB_SP 7
 #define MD_GET_SP(_t) (_t)->context[MD_JB_SP]
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
@@ -165,92 +134,6 @@ int _st_GetError(int err);
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
-#elif defined (HPUX)
-
-#define MD_STACK_GROWS_UP
-#define MD_USE_BSD_ANON_MMAP
-#define MD_ACCEPT_NB_INHERITED
-#define MD_ALWAYS_UNSERIALIZED_ACCEPT
-
-#define MD_SETJMP(env) _setjmp(env)
-#define MD_LONGJMP(env, val) _longjmp(env, val)
-
-#ifndef __LP64__
-// 32-bit mode (ILP32 data model)
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  ((long *)((_thread)->context))[1] = (long) (_sp); \
-  ST_END_MACRO
-#else
-// 64-bit mode (LP64 data model)
-#define MD_STACK_PAD_SIZE 256
-// Last stack frame must be preserved
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  memcpy((char *)(_sp) - MD_STACK_PAD_SIZE, \
-         ((char **)((_thread)->context))[1] - MD_STACK_PAD_SIZE, \
-         MD_STACK_PAD_SIZE); \
-  ((long *)((_thread)->context))[1] = (long) (_sp); \
-  ST_END_MACRO
-#endif
-
-#define MD_GET_UTIME() \
-  struct timeval tv; \
-  (void) gettimeofday(&tv, NULL); \
-  return (tv.tv_sec * 1000000LL + tv.tv_usec)
-
-#elif defined (IRIX)
-
-#include <sys/syssgi.h>
-
-#define MD_STACK_GROWS_DOWN
-#define MD_USE_SYSV_ANON_MMAP
-#define MD_ACCEPT_NB_INHERITED
-#define MD_ALWAYS_UNSERIALIZED_ACCEPT
-
-#define MD_SETJMP(env) setjmp(env)
-#define MD_LONGJMP(env, val) longjmp(env, val)
-
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  (void) MD_SETJMP((_thread)->context); \
-  (_thread)->context[JB_SP] = (long) (_sp); \
-  (_thread)->context[JB_PC] = (long) _main; \
-  ST_END_MACRO
-
-#define MD_GET_UTIME() \
-  static int inited = 0; \
-  static clockid_t clock_id = CLOCK_SGI_CYCLE; \
-  struct timespec ts; \
-  if (!inited) { \
-    if (syssgi(SGI_CYCLECNTR_SIZE) < 64) { \
-      clock_id = CLOCK_REALTIME; \
-    } \
-    inited = 1; \
-  } \
-  (void) clock_gettime(clock_id, &ts); \
-  return (ts.tv_sec * 1000000LL + ts.tv_nsec / 1000)
-
-/*
- * Cap the stack by zeroing out the saved return address register
- * value. This allows libexc, used by SpeedShop, to know when to stop
- * backtracing since it won't find main, start, or any other known
- * stack root function in a state thread's stack. Without this libexc
- * traces right off the stack and crashes.
- * The function preamble stores ra at 8(sp), this stores zero there.
- * N.B. This macro is compiler/ABI dependent. It must change if ANY more
- * automatic variables are added to the _st_thread_main() routine, because
- * the address where ra is stored will change.
- */
-#if !defined(__GNUC__) && defined(_MIPS_SIM) && _MIPS_SIM != _ABIO32
-#define MD_CAP_STACK(var_addr) \
-  (((volatile __uint64_t *)(var_addr))[1] = 0)
-#endif
-
 #elif defined (LINUX)
 
 // These are properties of the linux kernel and are the same on every flavor and architecture.
@@ -275,8 +158,7 @@ int _st_GetError(int err);
  * uses general register stack.  Thus each thread needs a backing store
  * for register stack in addition to memory stack.  Standard
  * setjmp()/longjmp() cannot be used for thread context switching
- * because their implementation implicitly assumes that only one
- * register stack exists.
+ * because their implementation implicitly assumes that only one register stack exists.
  */
 #ifdef USE_LIBC_SETJMP
 #undef USE_LIBC_SETJMP
@@ -284,6 +166,7 @@ int _st_GetError(int err);
 #define MD_USE_BUILTIN_SETJMP
 
 #define MD_STACK_PAD_SIZE 128
+
 // Last register stack frame must be preserved
 #define MD_INIT_CONTEXT(_thread, _sp, _bsp, _main) \
   ST_BEGIN_MACRO \
@@ -309,23 +192,8 @@ int _st_GetError(int err);
 #else
 
 /*
- * On linux, there are a few styles of jmpbuf format.  These vary based
- * on architecture/glibc combination.
- *
- * Most of the glibc based toggles were lifted from:
- * mozilla/nsprpub/pr/include/md/_linux.h
- */
-
-/*
- * Starting with glibc 2.4, JB_SP definitions are not public anymore.
- * They, however, can still be found in glibc source tree in
- * architecture-specific "jmpbuf-offsets.h" files.
- * Most importantly, the content of jmp_buf is mangled by setjmp to make
- * it completely opaque (the mangling can be disabled by setting the
- * LD_POINTER_GUARD environment variable before application execution).
- * Therefore we will use built-in _st_md_cxt_save/_st_md_cxt_restore
- * functions as a setjmp/longjmp replacement wherever they are available
- * unless USE_LIBC_SETJMP is defined.
+ * On linux, there are a few styles of jmpbuf format.  These vary based on architecture/glibc combination.
+ * Most of the glibc based toggles were lifted from: mozilla/nsprpub/pr/include/md/_linux.h
  */
 
 #if defined(__powerpc__)
@@ -418,14 +286,12 @@ int _st_GetError(int err);
 #elif defined(__hppa__)
 #define MD_STACK_GROWS_UP
 
-/* yes, this is gross, unfortunately at the moment (2002/08/01) there is
- * a bug in hppa's glibc header definition for JB_SP, so we can't use that...
- */
+// yes, this is gross, unfortunately at the moment (2002/08/01) there is a bug in hppa's glibc header definition for JB_SP, so we can't use that...
 #define MD_GET_SP(_t) (*(long *)(((char *)&(_t)->context[0].__jmpbuf[0]) + 76))
 
 #else
 #error "Unknown CPU architecture"
-#endif // Cases with common MD_INIT_CONTEXT and different SP locations
+#endif
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
   ST_BEGIN_MACRO \
@@ -434,7 +300,7 @@ int _st_GetError(int err);
   MD_GET_SP(_thread) = (long) (_sp); \
   ST_END_MACRO
 
-#endif // Cases with different MD_INIT_CONTEXT
+#endif
 
 #if defined(MD_USE_BUILTIN_SETJMP) && !defined(USE_LIBC_SETJMP)
 #define MD_SETJMP(env) _st_md_cxt_save(env)
@@ -447,144 +313,6 @@ extern void _st_md_cxt_restore(jmp_buf env, int val);
 #define MD_LONGJMP(env, val) longjmp(env, val)
 #endif
 
-#elif defined (NETBSD)
-
-#define MD_STACK_GROWS_DOWN
-#define MD_USE_BSD_ANON_MMAP
-#define MD_ACCEPT_NB_INHERITED
-#define MD_ALWAYS_UNSERIALIZED_ACCEPT
-#define MD_HAVE_SOCKLEN_T
-
-#define MD_SETJMP(env) _setjmp(env)
-#define MD_LONGJMP(env, val) _longjmp(env, val)
-
-#if defined(__i386__)
-#define MD_JB_SP   2
-#elif defined(__alpha__)
-#define MD_JB_SP  34
-#elif defined(__sparc__)
-#define MD_JB_SP   0
-#elif defined(__vax__)
-#define MD_JB_SP   2
-#else
-#error Unknown CPU architecture
-#endif
-
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  (_thread)->context[MD_JB_SP] = (long) (_sp); \
-  ST_END_MACRO
-
-#define MD_GET_UTIME() \
-  struct timeval tv; \
-  (void) gettimeofday(&tv, NULL); \
-  return (tv.tv_sec * 1000000LL + tv.tv_usec)
-
-#elif defined (OPENBSD)
-
-#define MD_STACK_GROWS_DOWN
-#define MD_USE_BSD_ANON_MMAP
-#define MD_ACCEPT_NB_INHERITED
-#define MD_ALWAYS_UNSERIALIZED_ACCEPT
-
-#define MD_SETJMP(env) _setjmp(env)
-#define MD_LONGJMP(env, val) _longjmp(env, val)
-
-#if defined(__i386__)
-#define MD_JB_SP   2
-#elif defined(__alpha__)
-#define MD_JB_SP  34
-#elif defined(__sparc__)
-#define MD_JB_SP   0
-#elif defined(__amd64__)
-#define MD_JB_SP   6
-#else
-#error Unknown CPU architecture
-#endif
-
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  (_thread)->context[MD_JB_SP] = (long) (_sp); \
-  ST_END_MACRO
-
-#define MD_GET_UTIME() \
-  struct timeval tv; \
-  (void) gettimeofday(&tv, NULL); \
-  return (tv.tv_sec * 1000000LL + tv.tv_usec)
-
-#elif defined (OSF1)
-
-#include <signal.h>
-
-#define MD_STACK_GROWS_DOWN
-#define MD_USE_SYSV_ANON_MMAP
-#define MD_ACCEPT_NB_NOT_INHERITED
-#define MD_ALWAYS_UNSERIALIZED_ACCEPT
-
-#define MD_SETJMP(env) _setjmp(env)
-#define MD_LONGJMP(env, val) _longjmp(env, val)
-
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  ((struct sigcontext *)((_thread)->context))->sc_sp = (long) (_sp); \
-  ST_END_MACRO
-
-#define MD_GET_UTIME() \
-  struct timeval tv; \
-  (void) gettimeofday(&tv, NULL); \
-  return (tv.tv_sec * 1000000LL + tv.tv_usec)
-
-#elif defined (SOLARIS)
-
-#include <sys/filio.h>
-extern int getpagesize(void);
-
-#define MD_STACK_GROWS_DOWN
-#define MD_USE_SYSV_ANON_MMAP
-#define MD_ACCEPT_NB_NOT_INHERITED
-
-#define MD_SETJMP(env) setjmp(env)
-#define MD_LONGJMP(env, val) longjmp(env, val)
-
-#if defined(sparc) || defined(__sparc)
-#ifdef _LP64
-#define MD_STACK_PAD_SIZE 4095
-#endif
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  (void) MD_SETJMP((_thread)->context); \
-  (_thread)->context[1] = (long) (_sp); \
-  (_thread)->context[2] = (long) _main; \
-  ST_END_MACRO
-#elif defined(i386) || defined(__i386)
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  (void) MD_SETJMP((_thread)->context); \
-  (_thread)->context[4] = (long) (_sp); \
-  (_thread)->context[5] = (long) _main; \
-  ST_END_MACRO
-#elif defined(__amd64__)
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  (_thread)->context[6] = (long) (_sp); \
-  ST_END_MACRO
-#else
-#error Unknown CPU architecture
-#endif
-
-#define MD_GET_UTIME() \
-  return (gethrtime() / 1000)
-
-#else
-#error Unknown OS
 #endif
 
 #if !defined(MD_HAVE_POLL) && !defined(MD_DONT_HAVE_POLL)

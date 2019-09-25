@@ -282,11 +282,9 @@ extern _st_eventsys_t* _st_eventsys;
 // Switch away from the current thread context by saving its state and calling the thread scheduler
 #define _ST_SWITCH_CONTEXT(_thread) \
     ST_BEGIN_MACRO \
-    ST_SWITCH_OUT_CB(_thread); \
     if (!MD_SETJMP((_thread)->context)) { \
         _st_vp_schedule(); \
     } \
-    ST_SWITCH_IN_CB(_thread); \
     ST_END_MACRO
 
 // Restore a thread context that was saved by _ST_SWITCH_CONTEXT
