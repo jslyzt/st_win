@@ -3,8 +3,7 @@
  * and consists of extensive modifications made during the year(s) 1999-2000.
  */
 
-#ifndef __ST_COMMON_H__
-#define __ST_COMMON_H__
+#pragma once
 
 #include <stddef.h>
 #include <sys/types.h>
@@ -23,12 +22,7 @@
 
 #define ST_BEGIN_MACRO  {
 #define ST_END_MACRO    }
-
-#ifdef DEBUG
-#define ST_HIDDEN   /*nothing*/
-#else
 #define	ST_HIDDEN   static
-#endif
 
 #include "public.h"
 #include "md.h"
@@ -129,17 +123,16 @@ struct _st_thread {
     int state;                  /* Thread's state */
     int flags;                  /* Thread's flags */
 
+#ifdef MD_INIT_CONTEXT
     void* (*start)(void* arg);  /* The start function of the thread */
     void* arg;                  /* Argument of the start function */
+#endif
     void* retval;               /* Return value of the start function */
 
     _st_stack_t* stack;	      /* Info about thread's stack */
 
     _st_clist_t links;          /* For putting on run/sleep/zombie queue */
     _st_clist_t wait_links;     /* For putting on mutex/condvar wait queue */
-#ifdef DEBUG
-    _st_clist_t tlink;          /* For putting on thread queue */
-#endif
 
     st_utime_t due;             /* Wakeup time when thread is sleeping */
     _st_thread_t* left;         /* For putting in timeout heap */
@@ -149,8 +142,12 @@ struct _st_thread {
     void** private_data;        /* Per thread private data */
 
     _st_cond_t* term;           /* Termination condition variable for join */
-
+#ifdef MD_INIT_CONTEXT
     jmp_buf context;            /* Thread's context */
+#else
+    void* context;
+    void* context_sp;
+#endif
 };
 
 
@@ -189,9 +186,7 @@ typedef struct _st_vp {
     _st_clist_t run_q;          /* run queue for this vp */
     _st_clist_t io_q;           /* io queue for this vp */
     _st_clist_t zombie_q;       /* zombie queue for this vp */
-#ifdef DEBUG
-    _st_clist_t thread_q;       /* all threads of this vp */
-#endif
+
     int pagesize;
 
     _st_thread_t* sleep_q;      /* sleep queue for this vp */
@@ -230,9 +225,6 @@ extern _st_eventsys_t* _st_eventsys;
 #define _ST_RUNQ                        (_st_this_vp.run_q)
 #define _ST_IOQ                         (_st_this_vp.io_q)
 #define _ST_ZOMBIEQ                     (_st_this_vp.zombie_q)
-#ifdef DEBUG
-#define _ST_THREADQ                     (_st_this_vp.thread_q)
-#endif
 
 #define _ST_PAGE_SIZE                   (_st_this_vp.pagesize)
 
@@ -253,16 +245,10 @@ extern _st_eventsys_t* _st_eventsys;
 #define _ST_DEL_RUNQ(_thr)  ST_REMOVE_LINK(&(_thr)->links)
 
 #define _ST_ADD_SLEEPQ(_thr, _timeout)  _st_add_sleep_q(_thr, _timeout)
-#define _ST_DEL_SLEEPQ(_thr)		_st_del_sleep_q(_thr)
+#define _ST_DEL_SLEEPQ(_thr)   _st_del_sleep_q(_thr)
 
 #define _ST_ADD_ZOMBIEQ(_thr)  ST_APPEND_LINK(&(_thr)->links, &_ST_ZOMBIEQ)
 #define _ST_DEL_ZOMBIEQ(_thr)  ST_REMOVE_LINK(&(_thr)->links)
-
-#ifdef DEBUG
-#define _ST_ADD_THREADQ(_thr)  ST_APPEND_LINK(&(_thr)->tlink, &_ST_THREADQ)
-#define _ST_DEL_THREADQ(_thr)  ST_REMOVE_LINK(&(_thr)->tlink)
-#endif
-
 
 /*****************************************
  * Thread states and flags
@@ -304,12 +290,6 @@ extern _st_eventsys_t* _st_eventsys;
 #define _ST_POLLQUEUE_PTR(_qp)      \
     ((_st_pollq_t *)((char *)(_qp) - offsetof(_st_pollq_t, links)))
 
-#ifdef DEBUG
-#define _ST_THREAD_THREADQ_PTR(_qp) \
-    ((_st_thread_t *)((char *)(_qp) - offsetof(_st_thread_t, tlink)))
-#endif
-
-
 /*****************************************
  * Constants
  */
@@ -337,25 +317,20 @@ extern _st_eventsys_t* _st_eventsys;
  * Threads context switching
  */
 
-#ifdef DEBUG
-void _st_iterate_threads(void);
-#define ST_DEBUG_ITERATE_THREADS() _st_iterate_threads()
-#else
 #define ST_DEBUG_ITERATE_THREADS()
-#endif
 
 #ifdef ST_SWITCH_CB
-#define ST_SWITCH_OUT_CB(_thread)		\
-    if (_st_this_vp.switch_out_cb != NULL &&	\
-        _thread != _st_this_vp.idle_thread &&	\
-        _thread->state != _ST_ST_ZOMBIE) {	\
-      _st_this_vp.switch_out_cb();		\
+#define ST_SWITCH_OUT_CB(_thread) \
+    if (_st_this_vp.switch_out_cb != NULL && \
+        _thread != _st_this_vp.idle_thread && \
+        _thread->state != _ST_ST_ZOMBIE) { \
+        _st_this_vp.switch_out_cb(); \
     }
-#define ST_SWITCH_IN_CB(_thread)		\
-    if (_st_this_vp.switch_in_cb != NULL &&	\
-	_thread != _st_this_vp.idle_thread &&	\
-	_thread->state != _ST_ST_ZOMBIE) {	\
-      _st_this_vp.switch_in_cb();		\
+#define ST_SWITCH_IN_CB(_thread) \
+    if (_st_this_vp.switch_in_cb != NULL && \
+        _thread != _st_this_vp.idle_thread && \
+        _thread->state != _ST_ST_ZOMBIE) { \
+        _st_this_vp.switch_in_cb(); \
     }
 #else
 #define ST_SWITCH_OUT_CB(_thread)
@@ -366,34 +341,24 @@ void _st_iterate_threads(void);
  * Switch away from the current thread context by saving its state and
  * calling the thread scheduler
  */
-#define _ST_SWITCH_CONTEXT(_thread)       \
-    ST_BEGIN_MACRO                        \
-    ST_SWITCH_OUT_CB(_thread);            \
+#define _ST_SWITCH_CONTEXT(_thread) \
+    ST_BEGIN_MACRO \
+    ST_SWITCH_OUT_CB(_thread); \
     if (!MD_SETJMP((_thread)->context)) { \
-      _st_vp_schedule();                  \
-    }                                     \
-    ST_DEBUG_ITERATE_THREADS();           \
-    ST_SWITCH_IN_CB(_thread);             \
+        _st_vp_schedule(); \
+    } \
+    ST_DEBUG_ITERATE_THREADS(); \
+    ST_SWITCH_IN_CB(_thread); \
     ST_END_MACRO
 
 /*
- * Restore a thread context that was saved by _ST_SWITCH_CONTEXT or
- * initialized by _ST_INIT_CONTEXT
+ * Restore a thread context that was saved by _ST_SWITCH_CONTEXT
  */
-#define _ST_RESTORE_CONTEXT(_thread)   \
-    ST_BEGIN_MACRO                     \
-    _ST_SET_CURRENT_THREAD(_thread);   \
+#define _ST_RESTORE_CONTEXT(_thread) \
+    ST_BEGIN_MACRO \
+    _ST_SET_CURRENT_THREAD(_thread); \
     MD_LONGJMP((_thread)->context, 1); \
     ST_END_MACRO
-
-/*
- * Initialize the thread context preparing it to execute _main
- */
-#ifdef MD_INIT_CONTEXT
-#define _ST_INIT_CONTEXT MD_INIT_CONTEXT
-#else
-#error Unknown OS
-#endif
 
 /*
  * Number of bytes reserved under the stack "bottom"
@@ -425,6 +390,3 @@ ssize_t st_read(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout);
 ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t timeout);
 int st_poll(struct pollfd* pds, int npds, st_utime_t timeout);
 _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinable, int stk_size);
-
-#endif /* !__ST_COMMON_H__ */
-

@@ -1,5 +1,4 @@
-#ifndef _STX_H_
-#define _STX_H_
+#pragma once
 
 #include <stdio.h>
 #include <string.h>
@@ -87,6 +86,3 @@ int stx_dns_getaddr(const char* hostname, struct in_addr* addr,
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* !_STX_H_ */
-

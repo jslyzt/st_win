@@ -1,5 +1,4 @@
-#ifndef __ST_THREAD_H__
-#define __ST_THREAD_H__
+#pragma once
 
 #ifndef WIN32
 #include <unistd.h>
@@ -116,14 +115,6 @@ extern int st_recvfrom(st_netfd_t fd, void* buf, int len, struct sockaddr* from,
 extern int st_sendto(st_netfd_t fd, const void* msg, int len, const struct sockaddr* to, int tolen, st_utime_t timeout);
 extern st_netfd_t st_open(const char* path, int oflags, mode_t mode);
 
-#ifdef DEBUG
-extern void _st_show_thread_stack(st_thread_t thread, const char* messg);
-extern void _st_iterate_threads(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* !__ST_THREAD_H__ */
-

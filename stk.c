@@ -40,8 +40,9 @@ _st_stack_t* _st_stack_new(int stack_size) {
     }
 
     /* Make a new thread stack object. */
-    if ((ts = (_st_stack_t*)calloc(1, sizeof(_st_stack_t))) == NULL)
+    if ((ts = (_st_stack_t*)calloc(1, sizeof(_st_stack_t))) == NULL) {
         return NULL;
+    }
     extra = _st_randomize_stacks ? _ST_PAGE_SIZE : 0;
     ts->vaddr_size = stack_size + 2 * REDZONE + extra;
     ts->vaddr = _st_new_stk_segment(ts->vaddr_size);
@@ -52,11 +53,6 @@ _st_stack_t* _st_stack_new(int stack_size) {
     ts->stk_size = stack_size;
     ts->stk_bottom = ts->vaddr + REDZONE;
     ts->stk_top = ts->stk_bottom + stack_size;
-
-#ifdef DEBUG
-    mprotect(ts->vaddr, REDZONE, PROT_NONE);
-    mprotect(ts->stk_top + extra, REDZONE, PROT_NONE);
-#endif
 
     if (extra) {
 #ifdef WIN32
@@ -76,9 +72,9 @@ _st_stack_t* _st_stack_new(int stack_size) {
  * Free the stack for the current thread
  */
 void _st_stack_free(_st_stack_t* ts) {
-    if (!ts)
+    if (!ts) {
         return;
-
+    }
     /* Put the stack on the free list */
     ST_APPEND_LINK(&ts->links, _st_free_stacks.prev);
     _st_num_free_stacks++;
@@ -95,8 +91,9 @@ static char* _st_new_stk_segment(int size) {
 
 #if defined (MD_USE_SYSV_ANON_MMAP)
     if (zero_fd < 0) {
-        if ((zero_fd = open("/dev/zero", O_RDWR, 0)) < 0)
+        if ((zero_fd = open("/dev/zero", O_RDWR, 0)) < 0) {
             return NULL;
+        }
         fcntl(zero_fd, F_SETFD, FD_CLOEXEC);
     }
 #elif defined (MD_USE_BSD_ANON_MMAP)
@@ -106,10 +103,10 @@ static char* _st_new_stk_segment(int size) {
 #endif
 
     vaddr = mmap(NULL, size, PROT_READ | PROT_WRITE, mmap_flags, zero_fd, 0);
-    if (vaddr == (void*)MAP_FAILED)
+    if (vaddr == (void*)MAP_FAILED) {
         return NULL;
-
-#endif /* MALLOC_STACK */
+    }
+#endif
 
     return (char*)vaddr;
 }

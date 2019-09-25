@@ -3,8 +3,7 @@
  * and consists of extensive modifications made during the year(s) 1999-2000.
  */
 
-#ifndef __ST_MD_H__
-#define __ST_MD_H__
+#pragma once
 
 #if defined(ETIMEDOUT) && !defined(ETIME)
 #define ETIME ETIMEDOUT
@@ -20,7 +19,7 @@
 
 /*****************************************
  * Platform specifics
- */
+ *****************************************/
 
 #if defined (AIX)
 
@@ -38,15 +37,15 @@
 #define MD_LONGJMP(env, val) _longjmp(env, val)
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO                             \
-  if (MD_SETJMP((_thread)->context))         \
-    _main();                                 \
-  (_thread)->context[3] = (long) (_sp);      \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
+  (_thread)->context[3] = (long) (_sp); \
   ST_END_MACRO
 
-#define MD_GET_UTIME()                        \
-  timebasestruct_t rt;                        \
-  (void) read_real_time(&rt, TIMEBASE_SZ);    \
+#define MD_GET_UTIME() \
+  timebasestruct_t rt; \
+  (void) read_real_time(&rt, TIMEBASE_SZ); \
   (void) time_base_to_time(&rt, TIMEBASE_SZ); \
   return (rt.tb_high * 1000000LL + rt.tb_low / 1000)
 
@@ -65,14 +64,14 @@
 #define MD_GET_SP(_t) (_t)->context[MD_JB_SP]
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO                             \
-  if (MD_SETJMP((_thread)->context))         \
-    _main();                                 \
-  MD_GET_SP(_thread) = (long) (_sp);         \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
+  MD_GET_SP(_thread) = (long) (_sp); \
   ST_END_MACRO
 
-#define MD_GET_UTIME()            \
-  struct timeval tv;              \
+#define MD_GET_UTIME() \
+  struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
@@ -94,31 +93,15 @@ int _st_GetError(int err);
 #define MD_ACCEPT_NB_NOT_INHERITED
 #define MD_ALWAYS_UNSERIALIZED_ACCEPT
 
-#define MD_SETJMP(env) setjmp(env)
-#define MD_LONGJMP(env, val) longjmp(env, val)
-
-#ifndef _M_X64
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  (_thread)->context[4] = (long)_sp; \
-  ST_END_MACRO
-
-#else
-#define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  (_thread)->context[4].Part[0] = (long)_sp; \
-  ST_END_MACRO
-
-#endif
-
 #define MD_GET_UTIME() \
   struct _timeb tb; \
   _ftime(&tb); \
   return((tb.time*1000000)+(tb.millitm*1000));
+
+#define MD_LONGJMP(ctx, v) \
+    if (ctx != NULL) { \
+        SwitchToFiber(ctx); \
+    }
 
 #elif defined (DARWIN)
 
@@ -141,15 +124,15 @@ int _st_GetError(int err);
 #error Unknown CPU architecture
 #endif
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main)   \
-  ST_BEGIN_MACRO                               \
-  if (MD_SETJMP((_thread)->context))           \
-    _main();                                   \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
   *((long *)&((_thread)->context[MD_JB_SP])) = (long) (_sp); \
   ST_END_MACRO
 
-#define MD_GET_UTIME()            \
-  struct timeval tv;              \
+#define MD_GET_UTIME() \
+  struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
@@ -173,15 +156,16 @@ int _st_GetError(int err);
 #error Unknown CPU architecture
 #endif
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main)          \
-  ST_BEGIN_MACRO                                      \
-  if (MD_SETJMP((_thread)->context))                  \
-    _main();                                          \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) { \
+    _main(); \
+  } \
   (_thread)->context[0]._jb[MD_JB_SP] = (long) (_sp); \
   ST_END_MACRO
 
-#define MD_GET_UTIME()            \
-  struct timeval tv;              \
+#define MD_GET_UTIME() \
+  struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
@@ -197,29 +181,29 @@ int _st_GetError(int err);
 
 #ifndef __LP64__
 /* 32-bit mode (ILP32 data model) */
-#define MD_INIT_CONTEXT(_thread, _sp, _main)        \
-  ST_BEGIN_MACRO                                    \
-  if (MD_SETJMP((_thread)->context))                \
-    _main();                                        \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
   ((long *)((_thread)->context))[1] = (long) (_sp); \
   ST_END_MACRO
 #else
 /* 64-bit mode (LP64 data model) */
 #define MD_STACK_PAD_SIZE 256
 /* Last stack frame must be preserved */
-#define MD_INIT_CONTEXT(_thread, _sp, _main)                     \
-  ST_BEGIN_MACRO                                                 \
-  if (MD_SETJMP((_thread)->context))                             \
-    _main();                                                     \
-  memcpy((char *)(_sp) - MD_STACK_PAD_SIZE,                      \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
+  memcpy((char *)(_sp) - MD_STACK_PAD_SIZE, \
          ((char **)((_thread)->context))[1] - MD_STACK_PAD_SIZE, \
-         MD_STACK_PAD_SIZE);                                     \
-  ((long *)((_thread)->context))[1] = (long) (_sp);              \
+         MD_STACK_PAD_SIZE); \
+  ((long *)((_thread)->context))[1] = (long) (_sp); \
   ST_END_MACRO
-#endif /* !__LP64__ */
+#endif
 
-#define MD_GET_UTIME()            \
-  struct timeval tv;              \
+#define MD_GET_UTIME() \
+  struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
@@ -236,22 +220,23 @@ int _st_GetError(int err);
 #define MD_LONGJMP(env, val) longjmp(env, val)
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO                             \
-  (void) MD_SETJMP((_thread)->context);      \
-  (_thread)->context[JB_SP] = (long) (_sp);  \
-  (_thread)->context[JB_PC] = (long) _main;  \
+  ST_BEGIN_MACRO \
+  (void) MD_SETJMP((_thread)->context); \
+  (_thread)->context[JB_SP] = (long) (_sp); \
+  (_thread)->context[JB_PC] = (long) _main; \
   ST_END_MACRO
 
-#define MD_GET_UTIME()                         \
-  static int inited = 0;                       \
+#define MD_GET_UTIME() \
+  static int inited = 0; \
   static clockid_t clock_id = CLOCK_SGI_CYCLE; \
-  struct timespec ts;                          \
-  if (!inited) {                               \
-    if (syssgi(SGI_CYCLECNTR_SIZE) < 64)       \
-      clock_id = CLOCK_REALTIME;               \
-    inited = 1;                                \
-  }                                            \
-  (void) clock_gettime(clock_id, &ts);         \
+  struct timespec ts; \
+  if (!inited) { \
+    if (syssgi(SGI_CYCLECNTR_SIZE) < 64) { \
+      clock_id = CLOCK_REALTIME; \
+    } \
+    inited = 1; \
+  } \
+  (void) clock_gettime(clock_id, &ts); \
   return (ts.tv_sec * 1000000LL + ts.tv_nsec / 1000)
 
 /*
@@ -288,8 +273,8 @@ int _st_GetError(int err);
  * All architectures and flavors of linux have the gettimeofday
  * function but if you know of a faster way, use it.
  */
-#define MD_GET_UTIME()            \
-  struct timeval tv;              \
+#define MD_GET_UTIME() \
+  struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
@@ -311,25 +296,25 @@ int _st_GetError(int err);
 
 #define MD_STACK_PAD_SIZE 128
 /* Last register stack frame must be preserved */
-#define MD_INIT_CONTEXT(_thread, _sp, _bsp, _main)                       \
-  ST_BEGIN_MACRO                                                         \
-  if (MD_SETJMP((_thread)->context))                                     \
-    _main();                                                             \
-  memcpy((char *)(_bsp) - MD_STACK_PAD_SIZE,                             \
+#define MD_INIT_CONTEXT(_thread, _sp, _bsp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
+  memcpy((char *)(_bsp) - MD_STACK_PAD_SIZE, \
          (char *)(_thread)->context[0].__jmpbuf[17] - MD_STACK_PAD_SIZE, \
-         MD_STACK_PAD_SIZE);                                             \
-  (_thread)->context[0].__jmpbuf[0]  = (long) (_sp);                     \
-  (_thread)->context[0].__jmpbuf[17] = (long) (_bsp);                    \
+         MD_STACK_PAD_SIZE); \
+  (_thread)->context[0].__jmpbuf[0]  = (long) (_sp); \
+  (_thread)->context[0].__jmpbuf[17] = (long) (_bsp); \
   ST_END_MACRO
 
 #elif defined(__mips__)
 #define MD_STACK_GROWS_DOWN
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main)               \
-  ST_BEGIN_MACRO                                           \
-  MD_SETJMP((_thread)->context);                           \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  MD_SETJMP((_thread)->context); \
   _thread->context[0].__jmpbuf[0].__pc = (__ptr_t) _main;  \
-  _thread->context[0].__jmpbuf[0].__sp = _sp;              \
+  _thread->context[0].__jmpbuf[0].__sp = _sp; \
   ST_END_MACRO
 
 #else /* Not IA-64 or mips */
@@ -446,8 +431,7 @@ int _st_GetError(int err);
 #define MD_STACK_GROWS_UP
 
 /* yes, this is gross, unfortunately at the moment (2002/08/01) there is
- * a bug in hppa's glibc header definition for JB_SP, so we can't
- * use that...
+ * a bug in hppa's glibc header definition for JB_SP, so we can't use that...
  */
 #define MD_GET_SP(_t) (*(long *)(((char *)&(_t)->context[0].__jmpbuf[0]) + 76))
 
@@ -456,10 +440,10 @@ int _st_GetError(int err);
 #endif /* Cases with common MD_INIT_CONTEXT and different SP locations */
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO                             \
-  if (MD_SETJMP((_thread)->context))         \
-    _main();                                 \
-  MD_GET_SP(_thread) = (long) (_sp);         \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
+  MD_GET_SP(_thread) = (long) (_sp); \
   ST_END_MACRO
 
 #endif /* Cases with different MD_INIT_CONTEXT */
@@ -498,15 +482,15 @@ extern void _st_md_cxt_restore(jmp_buf env, int val);
 #error Unknown CPU architecture
 #endif
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main)   \
-  ST_BEGIN_MACRO                               \
-  if (MD_SETJMP((_thread)->context))           \
-    _main();                                   \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
   (_thread)->context[MD_JB_SP] = (long) (_sp); \
   ST_END_MACRO
 
-#define MD_GET_UTIME()            \
-  struct timeval tv;              \
+#define MD_GET_UTIME() \
+  struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
@@ -532,15 +516,15 @@ extern void _st_md_cxt_restore(jmp_buf env, int val);
 #error Unknown CPU architecture
 #endif
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main)   \
-  ST_BEGIN_MACRO                               \
-  if (MD_SETJMP((_thread)->context))           \
-    _main();                                   \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
   (_thread)->context[MD_JB_SP] = (long) (_sp); \
   ST_END_MACRO
 
-#define MD_GET_UTIME()            \
-  struct timeval tv;              \
+#define MD_GET_UTIME() \
+  struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
@@ -556,15 +540,15 @@ extern void _st_md_cxt_restore(jmp_buf env, int val);
 #define MD_SETJMP(env) _setjmp(env)
 #define MD_LONGJMP(env, val) _longjmp(env, val)
 
-#define MD_INIT_CONTEXT(_thread, _sp, _main)                         \
-  ST_BEGIN_MACRO                                                     \
-  if (MD_SETJMP((_thread)->context))                                 \
-    _main();                                                         \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
   ((struct sigcontext *)((_thread)->context))->sc_sp = (long) (_sp); \
   ST_END_MACRO
 
-#define MD_GET_UTIME()            \
-  struct timeval tv;              \
+#define MD_GET_UTIME() \
+  struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
   return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
@@ -585,23 +569,23 @@ extern int getpagesize(void);
 #define MD_STACK_PAD_SIZE 4095
 #endif
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO                             \
-  (void) MD_SETJMP((_thread)->context);      \
-  (_thread)->context[1] = (long) (_sp);      \
-  (_thread)->context[2] = (long) _main;      \
+  ST_BEGIN_MACRO \
+  (void) MD_SETJMP((_thread)->context); \
+  (_thread)->context[1] = (long) (_sp); \
+  (_thread)->context[2] = (long) _main; \
   ST_END_MACRO
 #elif defined(i386) || defined(__i386)
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO                             \
-  (void) MD_SETJMP((_thread)->context);      \
-  (_thread)->context[4] = (long) (_sp);      \
-  (_thread)->context[5] = (long) _main;      \
+  ST_BEGIN_MACRO \
+  (void) MD_SETJMP((_thread)->context); \
+  (_thread)->context[4] = (long) (_sp); \
+  (_thread)->context[5] = (long) _main; \
   ST_END_MACRO
 #elif defined(__amd64__)
-#define MD_INIT_CONTEXT(_thread, _sp, _main)   \
-  ST_BEGIN_MACRO                               \
-  if (MD_SETJMP((_thread)->context))           \
-    _main();                                   \
+#define MD_INIT_CONTEXT(_thread, _sp, _main) \
+  ST_BEGIN_MACRO \
+  if (MD_SETJMP((_thread)->context)) \
+    _main(); \
   (_thread)->context[6] = (long) (_sp); \
   ST_END_MACRO
 #else
@@ -613,7 +597,7 @@ extern int getpagesize(void);
 
 #else
 #error Unknown OS
-#endif /* OS */
+#endif
 
 #if !defined(MD_HAVE_POLL) && !defined(MD_DONT_HAVE_POLL)
 #define MD_HAVE_POLL
@@ -630,6 +614,3 @@ extern int getpagesize(void);
 #ifndef MD_CAP_STACK
 #define MD_CAP_STACK(var_addr)
 #endif
-
-#endif /* !__ST_MD_H__ */
-

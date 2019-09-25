@@ -38,16 +38,18 @@ int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
         return -1;
     }
 
-    if ((*_st_eventsys->pollset_add)(pds, npds) < 0)
+    if ((*_st_eventsys->pollset_add)(pds, npds) < 0) {
         return -1;
+    }
 
     pq.pds = pds;
     pq.npds = npds;
     pq.thread = me;
     pq.on_ioq = 1;
     _ST_ADD_IOQ(pq);
-    if (timeout != ST_UTIME_NO_TIMEOUT)
+    if (timeout != ST_UTIME_NO_TIMEOUT) {
         _ST_ADD_SLEEPQ(me, timeout);
+    }
     me->state = _ST_ST_IO_WAIT;
 
     _ST_SWITCH_CONTEXT(me);
@@ -60,8 +62,9 @@ int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
     } else {
         /* Count the number of ready descriptors */
         for (pd = pds; pd < epd; pd++) {
-            if (pd->revents)
+            if (pd->revents) {
                 n++;
+            }
         }
     }
 
@@ -90,9 +93,7 @@ void _st_vp_schedule(void) {
 
     /* Resume the thread */
     thread->state = _ST_ST_RUNNING;
-    //_ST_RESTORE_CONTEXT(thread);
-    _st_this_thread = thread;
-    longjmp(thread->context, 1);
+    _ST_RESTORE_CONTEXT(thread);
 }
 
 
@@ -110,31 +111,28 @@ int st_init(void) {
     /* We can ignore return value here */
     st_set_eventsys(ST_EVENTSYS_DEFAULT);
 
-    if (_st_io_init() < 0)
+    if (_st_io_init() < 0) {
         return -1;
-
+    }
     memset(&_st_this_vp, 0, sizeof(_st_vp_t));
 
     ST_INIT_CLIST(&_ST_RUNQ);
     ST_INIT_CLIST(&_ST_IOQ);
     ST_INIT_CLIST(&_ST_ZOMBIEQ);
-#ifdef DEBUG
-    ST_INIT_CLIST(&_ST_THREADQ);
-#endif
 
-    if ((*_st_eventsys->init)() < 0)
+    if ((*_st_eventsys->init)() < 0) {
         return -1;
-
+    }
     _st_this_vp.pagesize = getpagesize();
     _st_this_vp.last_clock = st_utime();
 
     /*
      * Create idle thread
      */
-    _st_this_vp.idle_thread = st_thread_create(_st_idle_thread_start,
-                              NULL, 0, 0);
-    if (!_st_this_vp.idle_thread)
+    _st_this_vp.idle_thread = st_thread_create(_st_idle_thread_start, NULL, 0, 0);
+    if (!_st_this_vp.idle_thread) {
         return -1;
+    }
     _st_this_vp.idle_thread->flags = _ST_FL_IDLE_THREAD;
     _st_active_count--;
     _ST_DEL_RUNQ(_st_this_vp.idle_thread);
@@ -142,18 +140,15 @@ int st_init(void) {
     /*
      * Initialize primordial thread
      */
-    thread = (_st_thread_t*) calloc(1, sizeof(_st_thread_t) +
-                                    (ST_KEYS_MAX * sizeof(void*)));
-    if (!thread)
+    thread = (_st_thread_t*) calloc(1, sizeof(_st_thread_t) + (ST_KEYS_MAX * sizeof(void*)));
+    if (!thread) {
         return -1;
+    }
     thread->private_data = (void**)(thread + 1);
     thread->state = _ST_ST_RUNNING;
     thread->flags = _ST_FL_PRIMORDIAL;
     _ST_SET_CURRENT_THREAD(thread);
     _st_active_count++;
-#ifdef DEBUG
-    _ST_ADD_THREADQ(thread);
-#endif
 
     return 0;
 }
@@ -222,12 +217,9 @@ void st_thread_exit(void* retval) {
         thread->term = NULL;
     }
 
-#ifdef DEBUG
-    _ST_DEL_THREADQ(thread);
-#endif
-
-    if (!(thread->flags & _ST_FL_PRIMORDIAL))
+    if (!(thread->flags & _ST_FL_PRIMORDIAL)) {
         _st_stack_free(thread->stack);
+    }
 
     /* Find another thread to run */
     _ST_SWITCH_CONTEXT(thread);
@@ -255,13 +247,14 @@ int st_thread_join(_st_thread_t* thread, void** retvalp) {
     }
 
     while (thread->state != _ST_ST_ZOMBIE) {
-        if (st_cond_timedwait(term, ST_UTIME_NO_TIMEOUT) != 0)
+        if (st_cond_timedwait(term, ST_UTIME_NO_TIMEOUT) != 0) {
             return -1;
+        }
     }
 
-    if (retvalp)
+    if (retvalp) {
         *retvalp = thread->retval;
-
+    }
     /*
      * Remove target thread from the zombie queue and make it runnable.
      * When it gets scheduled later, it will do the clean up.
@@ -285,7 +278,13 @@ void _st_thread_main(void) {
     MD_CAP_STACK(&thread);
 
     /* Run thread main */
+#ifdef MD_INIT_CONTEXT
     thread->retval = (*thread->start)(thread->arg);
+#else
+    if (thread->context != NULL) {
+        SwitchToFiber(thread->context);
+    }
+#endif
 
     /* All done, time to go away */
     st_thread_exit(thread->retval);
@@ -540,17 +539,20 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
     /* Initialize thread */
     thread->private_data = ptds;
     thread->stack = stack;
+
+#ifdef MD_INIT_CONTEXT
     thread->start = start;
     thread->arg = arg;
-
 #ifdef __ia64__
-    _ST_INIT_CONTEXT(thread, stack->sp, stack->bsp, _st_thread_main);
+    MD_INIT_CONTEXT(thread, stack->sp, stack->bsp, _st_thread_main);
 #else
-    //_ST_INIT_CONTEXT(thread, stack->sp, _st_thread_main);
-    if (setjmp(thread->context)) {
-        _st_thread_main();
-    }
-    thread->context[4].Part[0] = (long)stack->sp;
+    MD_INIT_CONTEXT(thread, stack->sp, _st_thread_main);
+#endif
+#else
+    thread->context_sp = stack->sp;
+    SIZE_T commit_size = 4 * 1024;
+    SIZE_T stack_size = 1 * 1024 * 1024;
+    thread->context = CreateFiberEx(commit_size, stack_size, FIBER_FLAG_FLOAT_SWITCH, (LPFIBER_START_ROUTINE)start, (LPVOID)arg);
 #endif
 
     /* If thread is joinable, allocate a termination condition variable */
@@ -566,9 +568,6 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
     thread->state = _ST_ST_RUNNABLE;
     _st_active_count++;
     _ST_ADD_RUNQ(thread);
-#ifdef DEBUG
-    _ST_ADD_THREADQ(thread);
-#endif
 
     return thread;
 }
@@ -577,53 +576,3 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
 _st_thread_t* st_thread_self(void) {
     return _ST_CURRENT_THREAD();
 }
-
-
-#ifdef DEBUG
-/* ARGSUSED */
-void _st_show_thread_stack(_st_thread_t* thread, const char* messg) {
-
-}
-
-/* To be set from debugger */
-int _st_iterate_threads_flag = 0;
-
-void _st_iterate_threads(void) {
-    static _st_thread_t* thread = NULL;
-    static jmp_buf orig_jb, save_jb;
-    _st_clist_t* q;
-
-    if (!_st_iterate_threads_flag) {
-        if (thread) {
-            memcpy(thread->context, save_jb, sizeof(jmp_buf));
-            MD_LONGJMP(orig_jb, 1);
-        }
-        return;
-    }
-
-    if (thread) {
-        memcpy(thread->context, save_jb, sizeof(jmp_buf));
-        _st_show_thread_stack(thread, NULL);
-    } else {
-        if (MD_SETJMP(orig_jb)) {
-            _st_iterate_threads_flag = 0;
-            thread = NULL;
-            _st_show_thread_stack(thread, "Iteration completed");
-            return;
-        }
-        thread = _ST_CURRENT_THREAD();
-        _st_show_thread_stack(thread, "Iteration started");
-    }
-
-    q = thread->tlink.next;
-    if (q == &_ST_THREADQ)
-        q = q->next;
-    ST_ASSERT(q != &_ST_THREADQ);
-    thread = _ST_THREAD_THREADQ_PTR(q);
-    if (thread == _ST_CURRENT_THREAD())
-        MD_LONGJMP(orig_jb, 1);
-    memcpy(save_jb, thread->context, sizeof(jmp_buf));
-    MD_LONGJMP(thread->context, 1);
-}
-#endif /* DEBUG */
-

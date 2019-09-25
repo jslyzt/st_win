@@ -1,5 +1,4 @@
-#ifndef __STX_FILEIO_H__
-#define __STX_FILEIO_H__
+#pragma once
 
 #include <st.h>
 
@@ -12,4 +11,3 @@ extern ssize_t stx_file_read(st_netfd_t fd, off_t offset, void* buf, size_t nbyt
 #ifdef __cplusplus
 }
 #endif
-#endif /* !__STX_FILEIO_H__ */
