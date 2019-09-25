@@ -1,8 +1,3 @@
-/*
- * This file is derived directly from Netscape Communications Corporation,
- * and consists of extensive modifications made during the year(s) 1999-2000.
- */
-
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -13,7 +8,7 @@
 #include "common.h"
 
 
-/* How much space to leave between the stacks, at each end */
+// How much space to leave between the stacks, at each end
 #define REDZONE	_ST_PAGE_SIZE
 
 _st_clist_t _st_free_stacks = ST_INIT_STATIC_CLIST(&_st_free_stacks);
@@ -30,7 +25,7 @@ _st_stack_t* _st_stack_new(int stack_size) {
     for (qp = _st_free_stacks.next; qp != &_st_free_stacks; qp = qp->next) {
         ts = _ST_THREAD_STACK_PTR(qp);
         if (ts->stk_size >= stack_size) {
-            /* Found a stack that is big enough */
+            // Found a stack that is big enough
             ST_REMOVE_LINK(&ts->links);
             _st_num_free_stacks--;
             ts->links.next = NULL;
@@ -39,7 +34,7 @@ _st_stack_t* _st_stack_new(int stack_size) {
         }
     }
 
-    /* Make a new thread stack object. */
+    // Make a new thread stack object.
     if ((ts = (_st_stack_t*)calloc(1, sizeof(_st_stack_t))) == NULL) {
         return NULL;
     }
@@ -67,19 +62,15 @@ _st_stack_t* _st_stack_new(int stack_size) {
     return ts;
 }
 
-
-/*
- * Free the stack for the current thread
- */
+// Free the stack for the current thread
 void _st_stack_free(_st_stack_t* ts) {
     if (!ts) {
         return;
     }
-    /* Put the stack on the free list */
+    // Put the stack on the free list
     ST_APPEND_LINK(&ts->links, _st_free_stacks.prev);
     _st_num_free_stacks++;
 }
-
 
 static char* _st_new_stk_segment(int size) {
 #ifdef MALLOC_STACK
@@ -111,8 +102,6 @@ static char* _st_new_stk_segment(int size) {
     return (char*)vaddr;
 }
 
-
-/* Not used */
 #if 0
 void _st_delete_stk_segment(char* vaddr, int size) {
 #ifdef MALLOC_STACK
@@ -125,7 +114,6 @@ void _st_delete_stk_segment(char* vaddr, int size) {
 
 int st_randomize_stacks(int on) {
     int wason = _st_randomize_stacks;
-
     _st_randomize_stacks = on;
     if (on) {
 #ifdef WIN32

@@ -1,8 +1,3 @@
-/*
- * This file is derived directly from Netscape Communications Corporation,
- * and consists of extensive modifications made during the year(s) 1999-2000.
- */
-
 #include <stdlib.h>
 #ifdef WIN32
 #include <io.h>
@@ -28,12 +23,13 @@
 #endif
 #define _LOCAL_MAXIOV  16
 
-/* Winsock Data */
+// Winsock Data
 static WSADATA wsadata;
 
-/* File descriptor object free list */
+// File descriptor object free list
 static _st_netfd_t* _st_netfd_freelist = NULL;
-/* Maximum number of file descriptors that the process can open */
+
+// Maximum number of file descriptors that the process can open
 static int _st_osfd_limit = -1;
 
 static void _st_netfd_free_aux_data(_st_netfd_t* fd);
@@ -42,7 +38,7 @@ int st_errno(void) {
     return (errno);
 }
 
-/* _st_GetError xlate winsock errors to unix */
+// _st_GetError xlate winsock errors to unix
 int _st_GetError(int err) {
     int syserr;
 
@@ -126,13 +122,11 @@ int _st_GetError(int err) {
     return (syserr);
 }
 
-
 int getpagesize(void) {
     SYSTEM_INFO sysinf;
     GetSystemInfo(&sysinf);
     return (int)sysinf.dwPageSize;
 }
-
 
 int _st_io_init(void) {
     _st_osfd_limit = FD_SETSIZE;
@@ -140,11 +134,9 @@ int _st_io_init(void) {
     return 0;
 }
 
-
 int st_getfdlimit(void) {
     return _st_osfd_limit;
 }
-
 
 void st_netfd_free(_st_netfd_t* fd) {
     if (!fd->inuse) {
@@ -163,10 +155,8 @@ void st_netfd_free(_st_netfd_t* fd) {
     _st_netfd_freelist = fd;
 }
 
-
 static _st_netfd_t* _st_netfd_new(int osfd, int nonblock, int is_socket) {
     _st_netfd_t* fd;
-
     if ((*_st_eventsys->fd_new)(osfd) < 0) {
         return NULL;
     }
@@ -191,16 +181,13 @@ static _st_netfd_t* _st_netfd_new(int osfd, int nonblock, int is_socket) {
     return fd;
 }
 
-
 _st_netfd_t* st_netfd_open(int osfd) {
     return _st_netfd_new(osfd, 1, 0);
 }
 
-
 _st_netfd_t* st_netfd_open_socket(int osfd) {
     return _st_netfd_new(osfd, 1, 1);
 }
-
 
 int st_netfd_close(_st_netfd_t* fd) {
     if ((*_st_eventsys->fd_close)(fd->osfd) < 0) {
@@ -212,15 +199,13 @@ int st_netfd_close(_st_netfd_t* fd) {
     return errno;
 }
 
-
 int st_netfd_fileno(_st_netfd_t* fd) {
     return (fd->osfd);
 }
 
-
 void st_netfd_setspecific(_st_netfd_t* fd, void* value, _st_destructor_t destructor) {
     if (value != fd->private_data) {
-        /* Free up previously set non-NULL data value */
+        // Free up previously set non-NULL data value
         if (fd->private_data && fd->destructor) {
             (*(fd->destructor))(fd->private_data);
         }
@@ -229,15 +214,12 @@ void st_netfd_setspecific(_st_netfd_t* fd, void* value, _st_destructor_t destruc
     fd->destructor = destructor;
 }
 
-
 void* st_netfd_getspecific(_st_netfd_t* fd) {
     return (fd->private_data);
 }
 
 
-/*
- * Wait for I/O on a single descriptor.
- */
+// Wait for I/O on a single descriptor.
 int st_netfd_poll(_st_netfd_t* fd, int how, st_utime_t timeout) {
     struct pollfd pd;
     int n;
@@ -250,7 +232,7 @@ int st_netfd_poll(_st_netfd_t* fd, int how, st_utime_t timeout) {
         return -1;
     }
     if (n == 0) {
-        /* Timed out */
+        // Timed out
         errno = ETIME;
         return -1;
     }
@@ -261,14 +243,11 @@ int st_netfd_poll(_st_netfd_t* fd, int how, st_utime_t timeout) {
     return 0;
 }
 
-
-/* No-op */
 int st_netfd_serialize_accept(_st_netfd_t* fd) {
     fd->aux_data = NULL;
     return 0;
 }
 
-/* No-op */
 static void _st_netfd_free_aux_data(_st_netfd_t* fd) {
     fd->aux_data = NULL;
 }
@@ -285,14 +264,13 @@ _st_netfd_t* st_accept(_st_netfd_t* fd, struct sockaddr* addr, int* addrlen, st_
         if (!_IO_NOT_READY_ERROR) {
             return NULL;
         }
-        /* Wait until the socket becomes readable */
+        // Wait until the socket becomes readable
         if (st_netfd_poll(fd, POLLIN, timeout) < 0) {
             return NULL;
         }
     }
 
-    /* On some platforms the new socket created by accept() inherits */
-    /* the nonblocking attribute of the listening socket */
+    // On some platforms the new socket created by accept() inherits the nonblocking attribute of the listening socket
 #if defined (MD_ACCEPT_NB_INHERITED)
     newfd = _st_netfd_new((int)osfd, 0, 1);
 #elif defined (MD_ACCEPT_NB_NOT_INHERITED)
@@ -316,11 +294,11 @@ int st_connect(_st_netfd_t* fd, const struct sockaddr* addr, int addrlen, st_uti
             if (errno != EAGAIN && errno != EINTR) {
                 return -1;
             }
-            /* Wait until the socket becomes writable */
+            // Wait until the socket becomes writable
             if (st_netfd_poll(fd, POLLOUT, timeout) < 0) {
                 return -1;
             }
-            /* Try to find out whether the connection setup succeeded or failed */
+            // Try to find out whether the connection setup succeeded or failed
             n = sizeof(int);
             if (getsockopt(fd->osfd, SOL_SOCKET, SO_ERROR, (char*)&err, (socklen_t*)&n) < 0) {
                 return -1;
@@ -336,7 +314,6 @@ int st_connect(_st_netfd_t* fd, const struct sockaddr* addr, int addrlen, st_uti
     return 0;
 }
 
-
 ssize_t st_read(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout) {
     ssize_t n;
     while ((n = recv(fd->osfd, buf, (int)nbyte, 0)) < 0) {
@@ -347,14 +324,13 @@ ssize_t st_read(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout) {
         if (!_IO_NOT_READY_ERROR) {
             return (-1);
         }
-        /* Wait until the socket becomes readable */
+        // Wait until the socket becomes readable
         if (st_netfd_poll(fd, POLLIN, timeout) < 0) {
             return -1;
         }
     }
     return n;
 }
-
 
 ssize_t st_read_fully(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout) {
     ssize_t n;
@@ -376,14 +352,13 @@ ssize_t st_read_fully(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeo
             }
             buf = (void*)((char*)buf + n);
         }
-        /* Wait until the socket becomes readable */
+        // Wait until the socket becomes readable
         if (st_netfd_poll(fd, POLLIN, timeout) < 0) {
             return -1;
         }
     }
     return (ssize_t)(nbyte - nleft);
 }
-
 
 ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t timeout) {
     ssize_t n;
@@ -405,7 +380,7 @@ ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t time
             nleft -= n;
             buf = (const void*)((const char*)buf + n);
         }
-        /* Wait until the socket becomes writable */
+        // Wait until the socket becomes writable
         if (st_netfd_poll(fd, POLLOUT, timeout) < 0) {
             return -1;
         }
@@ -413,9 +388,7 @@ ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t time
     return (ssize_t)nbyte;
 }
 
-/*
- * Simple I/O functions for UDP.
- */
+// Simple I/O functions for UDP.
 int st_recvfrom(_st_netfd_t* fd, void* buf, int len, struct sockaddr* from, int* fromlen, st_utime_t timeout) {
     int n;
     while ((n = recvfrom(fd->osfd, buf, len, 0, from, (socklen_t*)fromlen)) < 0) {
@@ -426,14 +399,13 @@ int st_recvfrom(_st_netfd_t* fd, void* buf, int len, struct sockaddr* from, int*
         if (!_IO_NOT_READY_ERROR) {
             return -1;
         }
-        /* Wait until the socket becomes readable */
+        // Wait until the socket becomes readable
         if (st_netfd_poll(fd, POLLIN, timeout) < 0) {
             return -1;
         }
     }
     return n;
 }
-
 
 int st_sendto(_st_netfd_t* fd, const void* msg, int len, const struct sockaddr* to, int tolen, st_utime_t timeout) {
     int n;
@@ -445,7 +417,7 @@ int st_sendto(_st_netfd_t* fd, const void* msg, int len, const struct sockaddr* 
         if (!_IO_NOT_READY_ERROR) {
             return -1;
         }
-        /* Wait until the socket becomes writable */
+        // Wait until the socket becomes writable
         if (st_netfd_poll(fd, POLLOUT, timeout) < 0) {
             return -1;
         }
@@ -453,10 +425,7 @@ int st_sendto(_st_netfd_t* fd, const void* msg, int len, const struct sockaddr* 
     return n;
 }
 
-
-/*
- * To open FIFOs or other special files.
- */
+// To open FIFOs or other special files.
 _st_netfd_t* st_open(const char* path, int oflags, mode_t mode) {
     int osfd, err;
     _st_netfd_t* newfd;

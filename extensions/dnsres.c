@@ -6,7 +6,7 @@
 #define NETDB_INTERNAL h_NETDB_INTERNAL
 #endif
 
-/* New in Solaris 7 */
+// New in Solaris 7
 #if !defined(_getshort) && defined(ns_get16)
 #define _getshort(cp) ns_get16(cp)
 #define _getlong(cp)  ns_get32(cp)
@@ -20,8 +20,7 @@ typedef union {
 int _stx_dns_ttl;
 
 
-static int parse_answer(querybuf_t* ans, int len, struct in_addr* addrs,
-                        int* num_addrs) {
+static int parse_answer(querybuf_t* ans, int len, struct in_addr* addrs, int* num_addrs) {
     char buf[MAXPACKET];
     HEADER* ahp;
     u_char* cp, *eoa;
@@ -40,34 +39,35 @@ static int parse_answer(querybuf_t* ans, int len, struct in_addr* addrs,
     }
     while (ahp->ancount > 0 && cp < eoa && i < *num_addrs) {
         ahp->ancount--;
-        if ((n = dn_expand(ans->buf, eoa, cp, buf, sizeof(buf))) < 0)
+        if ((n = dn_expand(ans->buf, eoa, cp, buf, sizeof(buf))) < 0) {
             return -1;
+        }
         cp += n;
-        if (cp + 4 + 4 + 2 >= eoa)
+        if (cp + 4 + 4 + 2 >= eoa) {
             return -1;
+        }
         type = _getshort(cp);
         cp += 4;
-        if (type == T_A)
+        if (type == T_A) {
             _stx_dns_ttl = _getlong(cp);
+        }
         cp += 4;
         n = _getshort(cp);
         cp += 2;
         if (type == T_A) {
-            if (n > sizeof(*addrs) || cp + n > eoa)
+            if (n > sizeof(*addrs) || cp + n > eoa) {
                 return -1;
+            }
             memcpy(&addrs[i++], cp, n);
         }
         cp += n;
     }
-
     *num_addrs = i;
     return 0;
 }
 
 
-static int query_domain(st_netfd_t nfd, const char* name,
-                        struct in_addr* addrs, int* num_addrs,
-                        st_utime_t timeout) {
+static int query_domain(st_netfd_t nfd, const char* name, struct in_addr* addrs, int* num_addrs, st_utime_t timeout) {
     querybuf_t qbuf;
     u_char* buf = qbuf.buf;
     HEADER* hp = &qbuf.hdr;
@@ -82,28 +82,30 @@ static int query_domain(st_netfd_t nfd, const char* name,
         }
         id = hp->id;
 
-        if (st_sendto(nfd, buf, len, (struct sockaddr*) & (_res.nsaddr_list[i]),
-                      sizeof(struct sockaddr), timeout) != len) {
+        if (st_sendto(nfd, buf, len, (struct sockaddr*) & (_res.nsaddr_list[i]), sizeof(struct sockaddr), timeout) != len) {
             h_errno = NETDB_INTERNAL;
-            /* EINTR means interrupt by other thread, NOT by a caught signal */
-            if (errno == EINTR)
+            // EINTR means interrupt by other thread, NOT by a caught signal
+            if (errno == EINTR) {
                 return -1;
+            }
             continue;
         }
 
-        /* Wait for reply */
+        // Wait for reply
         do {
             len = st_recvfrom(nfd, buf, blen, NULL, NULL, timeout);
-            if (len <= 0)
+            if (len <= 0) {
                 break;
+            }
         } while (id != hp->id);
 
         if (len < HFIXEDSZ) {
             h_errno = NETDB_INTERNAL;
-            if (len >= 0)
+            if (len >= 0) {
                 errno = EMSGSIZE;
-            else if (errno == EINTR)  /* see the comment above */
+            } else if (errno == EINTR) {
                 return -1;
+            }
             continue;
         }
 
@@ -129,25 +131,24 @@ static int query_domain(st_netfd_t nfd, const char* name,
             continue;
         }
 
-        if (parse_answer(&qbuf, len, addrs, num_addrs) == 0)
+        if (parse_answer(&qbuf, len, addrs, num_addrs) == 0) {
             return 0;
+        }
     }
-
     return -1;
 }
 
 
 #define CLOSE_AND_RETURN(ret) \
-  {                           \
-    n = errno;                \
-    st_netfd_close(nfd);      \
-    errno = n;                \
-    return (ret);             \
+  { \
+    n = errno; \
+    st_netfd_close(nfd); \
+    errno = n; \
+    return (ret); \
   }
 
 
-int _stx_dns_getaddrlist(const char* host, struct in_addr* addrs,
-                         int* num_addrs, st_utime_t timeout) {
+int _stx_dns_getaddrlist(const char* host, struct in_addr* addrs, int* num_addrs, st_utime_t timeout) {
     char name[MAXDNAME], **domain;
     const char* cp;
     int s, n, maxlen, dots;
@@ -168,7 +169,7 @@ int _stx_dns_getaddrlist(const char* host, struct in_addr* addrs,
         return -1;
     }
 
-    /* Create UDP socket */
+    // Create UDP socket
     if ((s = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
         h_errno = NETDB_INTERNAL;
         return -1;
@@ -191,18 +192,17 @@ int _stx_dns_getaddrlist(const char* host, struct in_addr* addrs,
         dots += (*cp == '.');
         name[n++] = *cp;
     }
-    if (name[n - 1] == '.')
+    if (name[n - 1] == '.') {
         trailing_dot = 1;
-
-    /*
-     * If there are dots in the name already, let's just give it a try
-     * 'as is'.  The threshold can be set with the "ndots" option.
-     */
+    }
+    // If there are dots in the name already, let's just give it a try 'as is'.  The threshold can be set with the "ndots" option.
     if (dots >= _res.ndots) {
-        if (query_domain(nfd, host, addrs, num_addrs, timeout) == 0)
+        if (query_domain(nfd, host, addrs, num_addrs, timeout) == 0) {
             CLOSE_AND_RETURN(0);
-        if (h_errno == NETDB_INTERNAL && errno == EINTR)
+        }
+        if (h_errno == NETDB_INTERNAL && errno == EINTR) {
             CLOSE_AND_RETURN(-1);
+        }
         tried_as_is = 1;
     }
 
@@ -212,17 +212,19 @@ int _stx_dns_getaddrlist(const char* host, struct in_addr* addrs,
      *     - there is at least one dot, there is no trailing dot,
      *       and RES_DNSRCH is set.
      */
-    if ((!dots && (_res.options & RES_DEFNAMES)) ||
-            (dots && !trailing_dot && (_res.options & RES_DNSRCH))) {
+    if ((!dots && (_res.options & RES_DEFNAMES)) || (dots && !trailing_dot && (_res.options & RES_DNSRCH))) {
         name[n++] = '.';
         for (domain = _res.dnsrch; *domain; domain++) {
             strncpy(name + n, *domain, maxlen - n);
-            if (query_domain(nfd, name, addrs, num_addrs, timeout) == 0)
+            if (query_domain(nfd, name, addrs, num_addrs, timeout) == 0) {
                 CLOSE_AND_RETURN(0);
-            if (h_errno == NETDB_INTERNAL && errno == EINTR)
+            }
+            if (h_errno == NETDB_INTERNAL && errno == EINTR) {
                 CLOSE_AND_RETURN(-1);
-            if (!(_res.options & RES_DNSRCH))
+            }
+            if (!(_res.options & RES_DNSRCH)) {
                 break;
+            }
         }
     }
 
@@ -232,8 +234,9 @@ int _stx_dns_getaddrlist(const char* host, struct in_addr* addrs,
      * name or whether it ends with a dot.
      */
     if (!tried_as_is) {
-        if (query_domain(nfd, host, addrs, num_addrs, timeout) == 0)
+        if (query_domain(nfd, host, addrs, num_addrs, timeout) == 0) {
             CLOSE_AND_RETURN(0);
+        }
     }
 
     CLOSE_AND_RETURN(-1);

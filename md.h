@@ -1,8 +1,3 @@
-/*
- * This file is derived directly from Netscape Communications Corporation,
- * and consists of extensive modifications made during the year(s) 1999-2000.
- */
-
 #pragma once
 
 #if defined(ETIMEDOUT) && !defined(ETIME)
@@ -93,15 +88,16 @@ int _st_GetError(int err);
 #define MD_ACCEPT_NB_NOT_INHERITED
 #define MD_ALWAYS_UNSERIALIZED_ACCEPT
 
+#define MD_SETJMP(env)
+#define MD_LONGJMP(env, val) \
+    if (env != NULL) { \
+        SwitchToFiber(env); \
+    }
+
 #define MD_GET_UTIME() \
   struct _timeb tb; \
   _ftime(&tb); \
   return((tb.time*1000000)+(tb.millitm*1000));
-
-#define MD_LONGJMP(ctx, v) \
-    if (ctx != NULL) { \
-        SwitchToFiber(ctx); \
-    }
 
 #elif defined (DARWIN)
 
@@ -180,7 +176,7 @@ int _st_GetError(int err);
 #define MD_LONGJMP(env, val) _longjmp(env, val)
 
 #ifndef __LP64__
-/* 32-bit mode (ILP32 data model) */
+// 32-bit mode (ILP32 data model)
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
   ST_BEGIN_MACRO \
   if (MD_SETJMP((_thread)->context)) \
@@ -188,9 +184,9 @@ int _st_GetError(int err);
   ((long *)((_thread)->context))[1] = (long) (_sp); \
   ST_END_MACRO
 #else
-/* 64-bit mode (LP64 data model) */
+// 64-bit mode (LP64 data model)
 #define MD_STACK_PAD_SIZE 256
-/* Last stack frame must be preserved */
+// Last stack frame must be preserved
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
   ST_BEGIN_MACRO \
   if (MD_SETJMP((_thread)->context)) \
@@ -257,22 +253,15 @@ int _st_GetError(int err);
 
 #elif defined (LINUX)
 
-/*
- * These are properties of the linux kernel and are the same on every
- * flavor and architecture.
- */
+// These are properties of the linux kernel and are the same on every flavor and architecture.
 #define MD_USE_BSD_ANON_MMAP
 #define MD_ACCEPT_NB_NOT_INHERITED
 #define MD_ALWAYS_UNSERIALIZED_ACCEPT
-/*
- * Modern GNU/Linux is Posix.1g compliant.
- */
+
+// Modern GNU/Linux is Posix.1g compliant.
 #define MD_HAVE_SOCKLEN_T
 
-/*
- * All architectures and flavors of linux have the gettimeofday
- * function but if you know of a faster way, use it.
- */
+// All architectures and flavors of linux have the gettimeofday function but if you know of a faster way, use it.
 #define MD_GET_UTIME() \
   struct timeval tv; \
   (void) gettimeofday(&tv, NULL); \
@@ -295,7 +284,7 @@ int _st_GetError(int err);
 #define MD_USE_BUILTIN_SETJMP
 
 #define MD_STACK_PAD_SIZE 128
-/* Last register stack frame must be preserved */
+// Last register stack frame must be preserved
 #define MD_INIT_CONTEXT(_thread, _sp, _bsp, _main) \
   ST_BEGIN_MACRO \
   if (MD_SETJMP((_thread)->context)) \
@@ -317,7 +306,7 @@ int _st_GetError(int err);
   _thread->context[0].__jmpbuf[0].__sp = _sp; \
   ST_END_MACRO
 
-#else /* Not IA-64 or mips */
+#else
 
 /*
  * On linux, there are a few styles of jmpbuf format.  These vary based
@@ -348,10 +337,10 @@ int _st_GetError(int err);
 #endif
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_GPR1]
 #else
-/* not an error but certainly cause for caution */
+// not an error but certainly cause for caution
 #error "Untested use of old glibc on powerpc"
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__misc[0]
-#endif /* glibc 2.1 or later */
+#endif
 
 #elif defined(__alpha)
 #define MD_STACK_GROWS_DOWN
@@ -362,7 +351,7 @@ int _st_GetError(int err);
 #endif
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_SP]
 #else
-/* not an error but certainly cause for caution */
+// not an error but certainly cause for caution
 #error "Untested use of old glibc on alpha"
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__sp
 #endif
@@ -370,7 +359,7 @@ int _st_GetError(int err);
 #elif defined(__mc68000__)
 #define MD_STACK_GROWS_DOWN
 
-/* m68k still uses old style sigjmp_buf */
+// m68k still uses old style sigjmp_buf
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__sp
 
 #elif defined(__sparc__)
@@ -382,7 +371,7 @@ int _st_GetError(int err);
 #endif
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_SP]
 #else
-/* not an error but certainly cause for caution */
+// not an error but certainly cause for caution
 #error "Untested use of old glic on sparc -- also using odd mozilla derived __fp"
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__fp
 #endif
@@ -397,7 +386,7 @@ int _st_GetError(int err);
 #endif
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[JB_SP]
 #else
-/* not an error but certainly cause for caution */
+// not an error but certainly cause for caution
 #error "Untested use of old glibc on i386"
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__sp
 #endif
@@ -418,13 +407,12 @@ int _st_GetError(int err);
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[20]
 #else
 #error "ARM/Linux pre-glibc2 not supported yet"
-#endif /* defined(__GLIBC__) && __GLIBC__ >= 2 */
+#endif // defined(__GLIBC__) && __GLIBC__ >= 2
 
 #elif defined(__s390__)
 #define MD_STACK_GROWS_DOWN
 
-/* There is no JB_SP in glibc at this time. (glibc 2.2.5)
- */
+// There is no JB_SP in glibc at this time. (glibc 2.2.5)
 #define MD_GET_SP(_t) (_t)->context[0].__jmpbuf[0].__gregs[9]
 
 #elif defined(__hppa__)
@@ -437,7 +425,7 @@ int _st_GetError(int err);
 
 #else
 #error "Unknown CPU architecture"
-#endif /* Cases with common MD_INIT_CONTEXT and different SP locations */
+#endif // Cases with common MD_INIT_CONTEXT and different SP locations
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
   ST_BEGIN_MACRO \
@@ -446,7 +434,7 @@ int _st_GetError(int err);
   MD_GET_SP(_thread) = (long) (_sp); \
   ST_END_MACRO
 
-#endif /* Cases with different MD_INIT_CONTEXT */
+#endif // Cases with different MD_INIT_CONTEXT
 
 #if defined(MD_USE_BUILTIN_SETJMP) && !defined(USE_LIBC_SETJMP)
 #define MD_SETJMP(env) _st_md_cxt_save(env)

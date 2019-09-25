@@ -25,14 +25,11 @@ extern "C" {
 #endif
 
 
-/*****************************************
- * Basic types definitions
- */
-
+// Basic types definitions
 typedef struct _stx_centry stx_cache_entry_t;
 typedef struct _stx_cache  stx_cache_t;
 
-/* This is public type */
+// This is public type
 typedef struct _stx_cache_info {
     size_t max_size;
     size_t max_weight;
@@ -46,12 +43,8 @@ typedef struct _stx_cache_info {
 } stx_cache_info_t;
 
 
-/*****************************************
- * Cache and cache entry methods
- */
-
-stx_cache_t* stx_cache_create(size_t max_size, size_t max_weight,
-                              size_t hash_size,
+// Cache and cache entry methods
+stx_cache_t* stx_cache_create(size_t max_size, size_t max_weight, size_t hash_size,
                               unsigned long (*key_hash_fn)(const void* key),
                               long (*key_cmp_fn)(const void* key1, const void* key2),
                               void (*cleanup_fn)(void* key, void* data));
@@ -78,10 +71,8 @@ size_t stx_cache_entry_getweight(stx_cache_entry_t* entry);
 
 int stx_dns_cache_init(size_t max_size, size_t max_bytes, size_t hash_size);
 void stx_dns_cache_getinfo(stx_cache_info_t* info);
-int stx_dns_getaddrlist(const char* hostname, struct in_addr* addrs,
-                        int* num_addrs, st_utime_t timeout);
-int stx_dns_getaddr(const char* hostname, struct in_addr* addr,
-                    st_utime_t timeout);
+int stx_dns_getaddrlist(const char* hostname, struct in_addr* addrs, int* num_addrs, st_utime_t timeout);
+int stx_dns_getaddr(const char* hostname, struct in_addr* addr, st_utime_t timeout);
 
 #ifdef __cplusplus
 }

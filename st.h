@@ -17,12 +17,9 @@ typedef long long ssize_t;
 typedef int mode_t;
 #endif
 
-#define ST_VERSION	    "1.9"
+#define ST_VERSION          "1.9"
 #define ST_VERSION_MAJOR    1
 #define ST_VERSION_MINOR    9
-
-/* Undefine this to remove the context switch callback feature. */
-#define ST_SWITCH_CB
 
 #ifndef ETIME
 #define ETIME ETIMEDOUT
@@ -50,9 +47,6 @@ typedef struct _st_thread* st_thread_t;
 typedef struct _st_cond*    st_cond_t;
 typedef struct _st_mutex*   st_mutex_t;
 typedef struct _st_netfd*   st_netfd_t;
-#ifdef ST_SWITCH_CB
-typedef void (*st_switch_cb_t)(void);
-#endif
 
 extern int st_init(void);
 extern int st_getfdlimit(void);
@@ -60,11 +54,6 @@ extern int st_getfdlimit(void);
 extern int st_set_eventsys(int eventsys);
 extern int st_get_eventsys(void);
 extern const char* st_get_eventsys_name(void);
-
-#ifdef ST_SWITCH_CB
-extern st_switch_cb_t st_set_switch_in_cb(st_switch_cb_t cb);
-extern st_switch_cb_t st_set_switch_out_cb(st_switch_cb_t cb);
-#endif
 
 extern st_thread_t st_thread_self(void);
 extern void st_thread_exit(void* retval);

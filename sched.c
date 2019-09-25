@@ -1,8 +1,3 @@
-/*
- * This file is derived directly from Netscape Communications Corporation,
- * and consists of extensive modifications made during the year(s) 1999-2000.
- */
-
 #include <stdlib.h>
 #ifndef WIN32
 #include <unistd.h>
@@ -16,13 +11,13 @@
 #include "common.h"
 
 
-/* Global data */
-_st_vp_t _st_this_vp;           /* This VP */
-_st_thread_t* _st_this_thread;  /* Current thread */
-int _st_active_count = 0;       /* Active thread count */
+// Global data
+_st_vp_t _st_this_vp;           // This VP
+_st_thread_t* _st_this_thread;  // Current thread
+int _st_active_count = 0;       // Active thread count
 
-time_t _st_curr_time = 0;       /* Current time as returned by time(2) */
-st_utime_t _st_last_tset;       /* Last time it was fetched */
+time_t _st_curr_time = 0;       // Current time as returned by time(2)
+st_utime_t _st_last_tset;       // Last time it was fetched
 
 
 int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
@@ -56,11 +51,11 @@ int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
 
     n = 0;
     if (pq.on_ioq) {
-        /* If we timed out, the pollq might still be on the ioq. Remove it */
+        // If we timed out, the pollq might still be on the ioq. Remove it
         _ST_DEL_IOQ(pq);
         (*_st_eventsys->pollset_del)(pds, npds);
     } else {
-        /* Count the number of ready descriptors */
+        // Count the number of ready descriptors
         for (pd = pds; pd < epd; pd++) {
             if (pd->revents) {
                 n++;
@@ -73,42 +68,37 @@ int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
         errno = EINTR;
         return -1;
     }
-
     return n;
 }
-
 
 void _st_vp_schedule(void) {
     _st_thread_t* thread;
 
     if (_ST_RUNQ.next != &_ST_RUNQ) {
-        /* Pull thread off of the run queue */
+        // Pull thread off of the run queue
         thread = _ST_THREAD_PTR(_ST_RUNQ.next);
         _ST_DEL_RUNQ(thread);
     } else {
-        /* If there are no threads to run, switch to the idle thread */
+        // If there are no threads to run, switch to the idle thread
         thread = _st_this_vp.idle_thread;
     }
     ST_ASSERT(thread->state == _ST_ST_RUNNABLE);
 
-    /* Resume the thread */
+    // Resume the thread
     thread->state = _ST_ST_RUNNING;
     _ST_RESTORE_CONTEXT(thread);
 }
 
-
-/*
- * Initialize this Virtual Processor
- */
+// Initialize this Virtual Processor
 int st_init(void) {
     _st_thread_t* thread;
 
     if (_st_active_count) {
-        /* Already initialized */
+        // Already initialized
         return 0;
     }
 
-    /* We can ignore return value here */
+    // We can ignore return value here
     st_set_eventsys(ST_EVENTSYS_DEFAULT);
 
     if (_st_io_init() < 0) {
@@ -126,9 +116,7 @@ int st_init(void) {
     _st_this_vp.pagesize = getpagesize();
     _st_this_vp.last_clock = st_utime();
 
-    /*
-     * Create idle thread
-     */
+    // Create idle thread
     _st_this_vp.idle_thread = st_thread_create(_st_idle_thread_start, NULL, 0, 0);
     if (!_st_this_vp.idle_thread) {
         return -1;
@@ -137,9 +125,7 @@ int st_init(void) {
     _st_active_count--;
     _ST_DEL_RUNQ(_st_this_vp.idle_thread);
 
-    /*
-     * Initialize primordial thread
-     */
+    // Initialize primordial thread
     thread = (_st_thread_t*) calloc(1, sizeof(_st_thread_t) + (ST_KEYS_MAX * sizeof(void*)));
     if (!thread) {
         return -1;
@@ -153,47 +139,27 @@ int st_init(void) {
     return 0;
 }
 
-
-#ifdef ST_SWITCH_CB
-st_switch_cb_t st_set_switch_in_cb(st_switch_cb_t cb) {
-    st_switch_cb_t ocb = _st_this_vp.switch_in_cb;
-    _st_this_vp.switch_in_cb = cb;
-    return ocb;
-}
-
-st_switch_cb_t st_set_switch_out_cb(st_switch_cb_t cb) {
-    st_switch_cb_t ocb = _st_this_vp.switch_out_cb;
-    _st_this_vp.switch_out_cb = cb;
-    return ocb;
-}
-#endif
-
-
-/*
- * Start function for the idle thread
- */
-/* ARGSUSED */
+// Start function for the idle thread
 void* _st_idle_thread_start(void* arg) {
     _st_thread_t* me = _ST_CURRENT_THREAD();
 
     while (_st_active_count > 0) {
-        /* Idle vp till I/O is ready or the smallest timeout expired */
+        // Idle vp till I/O is ready or the smallest timeout expired
         _ST_VP_IDLE();
 
-        /* Check sleep queue for expired threads */
+        // Check sleep queue for expired threads
         _st_vp_check_clock();
 
         me->state = _ST_ST_RUNNABLE;
         _ST_SWITCH_CONTEXT(me);
     }
 
-    /* No more threads */
+    // No more threads
     exit(0);
 
-    /* NOTREACHED */
+    // NOTREACHED
     return NULL;
 }
-
 
 void st_thread_exit(void* retval) {
     _st_thread_t* thread = _ST_CURRENT_THREAD();
@@ -202,17 +168,17 @@ void st_thread_exit(void* retval) {
     _st_thread_cleanup(thread);
     _st_active_count--;
     if (thread->term) {
-        /* Put thread on the zombie queue */
+        // Put thread on the zombie queue
         thread->state = _ST_ST_ZOMBIE;
         _ST_ADD_ZOMBIEQ(thread);
 
-        /* Notify on our termination condition variable */
+        // Notify on our termination condition variable
         st_cond_signal(thread->term);
 
-        /* Switch context and come back later */
+        // Switch context and come back later
         _ST_SWITCH_CONTEXT(thread);
 
-        /* Continue the cleanup */
+        // Continue the cleanup
         st_cond_destroy(thread->term);
         thread->term = NULL;
     }
@@ -221,16 +187,15 @@ void st_thread_exit(void* retval) {
         _st_stack_free(thread->stack);
     }
 
-    /* Find another thread to run */
+    // Find another thread to run
     _ST_SWITCH_CONTEXT(thread);
-    /* Not going to land here */
+    // Not going to land here
 }
-
 
 int st_thread_join(_st_thread_t* thread, void** retvalp) {
     _st_cond_t* term = thread->term;
 
-    /* Can't join a non-joinable thread */
+    // Can't join a non-joinable thread
     if (term == NULL) {
         errno = EINVAL;
         return -1;
@@ -240,7 +205,7 @@ int st_thread_join(_st_thread_t* thread, void** retvalp) {
         return -1;
     }
 
-    /* Multiple threads can't wait on the same joinable thread */
+    // Multiple threads can't wait on the same joinable thread
     if (term->wait_q.next != &term->wait_q) {
         errno = EINVAL;
         return -1;
@@ -255,10 +220,8 @@ int st_thread_join(_st_thread_t* thread, void** retvalp) {
     if (retvalp) {
         *retvalp = thread->retval;
     }
-    /*
-     * Remove target thread from the zombie queue and make it runnable.
-     * When it gets scheduled later, it will do the clean up.
-     */
+
+    // Remove target thread from the zombie queue and make it runnable. When it gets scheduled later, it will do the clean up.
     thread->state = _ST_ST_RUNNABLE;
     _ST_DEL_ZOMBIEQ(thread);
     _ST_ADD_RUNQ(thread);
@@ -266,18 +229,14 @@ int st_thread_join(_st_thread_t* thread, void** retvalp) {
     return 0;
 }
 
-
 void _st_thread_main(void) {
     _st_thread_t* thread = _ST_CURRENT_THREAD();
 
-    /*
-     * Cap the stack by zeroing out the saved return address register
-     * value. This allows some debugging/profiling tools to know when
-     * to stop unwinding the stack. It's a no-op on most platforms.
-     */
+    // Cap the stack by zeroing out the saved return address register value. This allows some debugging/profiling tools
+    // to know when to stop unwinding the stack. It's a no-op on most platforms.
     MD_CAP_STACK(&thread);
 
-    /* Run thread main */
+    // Run thread main
 #ifdef MD_INIT_CONTEXT
     thread->retval = (*thread->start)(thread->arg);
 #else
@@ -286,16 +245,12 @@ void _st_thread_main(void) {
     }
 #endif
 
-    /* All done, time to go away */
+    // All done, time to go away
     st_thread_exit(thread->retval);
 }
 
-
-/*
- * Insert "thread" into the timeout heap, in the position
- * specified by thread->heap_index.  See docs/timeout_heap.txt
- * for details about the timeout heap.
- */
+// Insert "thread" into the timeout heap, in the position specified by thread->heap_index.
+// See docs/timeout_heap.txt for details about the timeout heap.
 static _st_thread_t** heap_insert(_st_thread_t* thread) {
     int target = thread->heap_index;
     int s = target;
@@ -331,16 +286,13 @@ static _st_thread_t** heap_insert(_st_thread_t* thread) {
     return p;
 }
 
-
-/*
- * Delete "thread" from the timeout heap.
- */
+// Delete "thread" from the timeout heap.
 static void heap_delete(_st_thread_t* thread) {
     _st_thread_t* t, **p;
     int bits = 0;
     int s, bit;
 
-    /* First find and unlink the last heap element */
+    // First find and unlink the last heap element
     p = &_ST_SLEEPQ;
     s = _ST_SLEEPQ_SIZE;
     while (s) {
@@ -358,29 +310,26 @@ static void heap_delete(_st_thread_t* thread) {
     *p = NULL;
     --_ST_SLEEPQ_SIZE;
     if (t != thread) {
-        /*
-         * Insert the unlinked last element in place of the element we are deleting
-         */
+        // Insert the unlinked last element in place of the element we are deleting
         t->heap_index = thread->heap_index;
         p = heap_insert(t);
         t = *p;
         t->left = thread->left;
         t->right = thread->right;
 
-        /*
-         * Reestablish the heap invariant.
-         */
+        // Reestablish the heap invariant.
         for (;;) {
-            _st_thread_t* y; /* The younger child */
+            _st_thread_t* y; // The younger child
             int index_tmp;
-            if (t->left == NULL)
+            if (t->left == NULL) {
                 break;
-            else if (t->right == NULL)
+            } else if (t->right == NULL) {
                 y = t->left;
-            else if (t->left->due < t->right->due)
+            } else if (t->left->due < t->right->due) {
                 y = t->left;
-            else
+            } else {
                 y = t->right;
+            }
             if (t->due > y->due) {
                 _st_thread_t* tl = y->left;
                 _st_thread_t* tr = y->right;
@@ -407,7 +356,6 @@ static void heap_delete(_st_thread_t* thread) {
     thread->left = thread->right = NULL;
 }
 
-
 void _st_add_sleep_q(_st_thread_t* thread, st_utime_t timeout) {
     thread->due = _ST_LAST_CLOCK + timeout;
     thread->flags |= _ST_FL_ON_SLEEPQ;
@@ -415,12 +363,10 @@ void _st_add_sleep_q(_st_thread_t* thread, st_utime_t timeout) {
     heap_insert(thread);
 }
 
-
 void _st_del_sleep_q(_st_thread_t* thread) {
     heap_delete(thread);
     thread->flags &= ~_ST_FL_ON_SLEEPQ;
 }
-
 
 void _st_vp_check_clock(void) {
     _st_thread_t* thread;
@@ -442,39 +388,35 @@ void _st_vp_check_clock(void) {
             break;
         _ST_DEL_SLEEPQ(thread);
 
-        /* If thread is waiting on condition variable, set the time out flag */
-        if (thread->state == _ST_ST_COND_WAIT)
+        // If thread is waiting on condition variable, set the time out flag
+        if (thread->state == _ST_ST_COND_WAIT) {
             thread->flags |= _ST_FL_TIMEDOUT;
-
-        /* Make thread runnable */
+        }
+        // Make thread runnable
         ST_ASSERT(!(thread->flags & _ST_FL_IDLE_THREAD));
         thread->state = _ST_ST_RUNNABLE;
         _ST_ADD_RUNQ(thread);
     }
 }
 
-
 void st_thread_interrupt(_st_thread_t* thread) {
-    /* If thread is already dead */
-    if (thread->state == _ST_ST_ZOMBIE)
+    // If thread is already dead
+    if (thread->state == _ST_ST_ZOMBIE) {
         return;
-
+    }
     thread->flags |= _ST_FL_INTERRUPT;
-
-    if (thread->state == _ST_ST_RUNNING || thread->state == _ST_ST_RUNNABLE)
+    if (thread->state == _ST_ST_RUNNING || thread->state == _ST_ST_RUNNABLE) {
         return;
-
-    if (thread->flags & _ST_FL_ON_SLEEPQ)
+    }
+    if (thread->flags & _ST_FL_ON_SLEEPQ) {
         _ST_DEL_SLEEPQ(thread);
-
-    /* Make thread runnable */
+    }
+    // Make thread runnable
     thread->state = _ST_ST_RUNNABLE;
     _ST_ADD_RUNQ(thread);
 }
 
-
-_st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
-                               int joinable, int stk_size) {
+_st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinable, int stk_size) {
     _st_thread_t* thread;
     _st_stack_t* stack;
     void** ptds;
@@ -483,15 +425,16 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
     char* bsp;
 #endif
 
-    /* Adjust stack size */
-    if (stk_size == 0)
+    // Adjust stack size
+    if (stk_size == 0) {
         stk_size = ST_DEFAULT_STACK_SIZE;
+    }
     stk_size = ((stk_size + _ST_PAGE_SIZE - 1) / _ST_PAGE_SIZE) * _ST_PAGE_SIZE;
     stack = _st_stack_new(stk_size);
-    if (!stack)
+    if (!stack) {
         return NULL;
-
-    /* Allocate thread object and per-thread data off the stack */
+    }
+    // Allocate thread object and per-thread data off the stack
 #if defined (MD_STACK_GROWS_DOWN)
     sp = stack->stk_top;
 #ifdef __ia64__
@@ -504,9 +447,10 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
      */
     sp -= (stk_size >> 1);
     bsp = sp;
-    /* Make register stack 64-byte aligned */
-    if ((unsigned long)bsp & 0x3f)
+    // Make register stack 64-byte aligned
+    if ((unsigned long)bsp & 0x3f) {
         bsp = bsp + (0x40 - ((unsigned long)bsp & 0x3f));
+    }
     stack->bsp = bsp + _ST_STACK_PAD_SIZE;
 #endif
     sp = sp - (ST_KEYS_MAX * sizeof(void*));
@@ -514,9 +458,10 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
     sp = sp - sizeof(_st_thread_t);
     thread = (_st_thread_t*) sp;
 
-    /* Make stack 64-byte aligned */
-    if ((unsigned long)sp & 0x3f)
+    // Make stack 64-byte aligned
+    if ((unsigned long)sp & 0x3f) {
         sp = sp - ((unsigned long)sp & 0x3f);
+    }
     stack->sp = sp - _ST_STACK_PAD_SIZE;
 #elif defined (MD_STACK_GROWS_UP)
     sp = stack->stk_bottom;
@@ -525,9 +470,10 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
     ptds = (void**) sp;
     sp = sp + (ST_KEYS_MAX * sizeof(void*));
 
-    /* Make stack 64-byte aligned */
-    if ((unsigned long)sp & 0x3f)
+    // Make stack 64-byte aligned
+    if ((unsigned long)sp & 0x3f) {
         sp = sp + (0x40 - ((unsigned long)sp & 0x3f));
+    }
     stack->sp = sp + _ST_STACK_PAD_SIZE;
 #else
 #error Unknown OS
@@ -536,7 +482,7 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
     memset(thread, 0, sizeof(_st_thread_t));
     memset(ptds, 0, ST_KEYS_MAX * sizeof(void*));
 
-    /* Initialize thread */
+    // Initialize thread
     thread->private_data = ptds;
     thread->stack = stack;
 
@@ -549,13 +495,12 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
     MD_INIT_CONTEXT(thread, stack->sp, _st_thread_main);
 #endif
 #else
-    thread->context_sp = stack->sp;
     SIZE_T commit_size = 4 * 1024;
     SIZE_T stack_size = 1 * 1024 * 1024;
     thread->context = CreateFiberEx(commit_size, stack_size, FIBER_FLAG_FLOAT_SWITCH, (LPFIBER_START_ROUTINE)start, (LPVOID)arg);
 #endif
 
-    /* If thread is joinable, allocate a termination condition variable */
+    // If thread is joinable, allocate a termination condition variable
     if (joinable) {
         thread->term = st_cond_new();
         if (thread->term == NULL) {
@@ -564,14 +509,13 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg,
         }
     }
 
-    /* Make thread runnable */
+    // Make thread runnable
     thread->state = _ST_ST_RUNNABLE;
     _st_active_count++;
     _ST_ADD_RUNQ(thread);
 
     return thread;
 }
-
 
 _st_thread_t* st_thread_self(void) {
     return _ST_CURRENT_THREAD();

@@ -1,5 +1,4 @@
 #include <stdlib.h>
-
 #include "stx_fileio.h"
 
 #define STX_FILEIO_SIGNUM SIGUSR2
@@ -32,9 +31,9 @@ file_reader(int fd, int* fd_control, int* fd_out) {
     pid_t pid;
     int control_pipe[2], out_pipe[2];
 
-    if (pipe(control_pipe) < 0 || pipe(out_pipe) < 0)
+    if (pipe(control_pipe) < 0 || pipe(out_pipe) < 0) {
         return (pid_t) - 1;
-
+    }
     pid = fork();
     if (pid == (pid_t) - 1) {
         close(control_pipe[0]);
@@ -52,16 +51,19 @@ file_reader(int fd, int* fd_control, int* fd_out) {
 
         while (sizeof(cb) == read(control_pipe[0], &cb, sizeof(cb))) {
             ssize_t nb;
-            if (0 >= cb.nbytes)
+            if (0 >= cb.nbytes) {
                 goto clean_exit;
+            }
             if (pos != cb.offset) {
                 pos = lseek(fd, cb.offset, SEEK_SET);
-                if (pos == (off_t) - 1)
+                if (pos == (off_t)-1) {
                     break;
+                }
             }
             nb = read(fd, buf, cb.nbytes);
-            if (nb == (ssize_t) - 1)
+            if (nb == (ssize_t)-1) {
                 break;
+            }
             pos += nb;
             write(out_pipe[1], (char*)&nb, sizeof(nb));
             write(out_pipe[1], buf, nb);
@@ -83,9 +85,7 @@ clean_exit:
     return pid;
 }
 
-/**
- * fileio_data_t destructor callback
- */
+// fileio_data_t destructor callback
 static void
 fileio_data_destructor(void* dat_in) {
     if (dat_in) {
@@ -101,10 +101,7 @@ fileio_data_destructor(void* dat_in) {
     }
 }
 
-/**
- * Retrieve fileio_data_t struct from an st descriptor.  Create and store
- * a new one if needed.
- */
+// Retrieve fileio_data_t struct from an st descriptor.  Create and store a new one if needed.
 static fileio_data_t* get_fileio_data(st_netfd_t fd) {
     fileio_data_t* dat = (fileio_data_t*)st_netfd_getspecific(fd);
     if (!dat) {
@@ -132,8 +129,7 @@ static fileio_data_t* get_fileio_data(st_netfd_t fd) {
  * @param nbytes size of the output buffer
  * @param timeout
  */
-ssize_t
-stx_file_read(st_netfd_t fd, off_t offset, void* buf, size_t nbytes, st_utime_t timeout) {
+ssize_t stx_file_read(st_netfd_t fd, off_t offset, void* buf, size_t nbytes, st_utime_t timeout) {
     fileio_data_t* dat = get_fileio_data(fd);
     if (dat) {
         file_reader_cb_t cb;
@@ -147,6 +143,5 @@ stx_file_read(st_netfd_t fd, off_t offset, void* buf, size_t nbytes, st_utime_t 
             return ret;
         }
     }
-
     return (ssize_t) - 1;
 }

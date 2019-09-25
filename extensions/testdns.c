@@ -2,7 +2,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
 #define MAX_ADDRS 128
 #define TIMEOUT (4*1000000LL)
 
@@ -12,15 +11,18 @@ static void do_resolve(const char* host) {
 
     if (stx_dns_getaddrlist(host, addrs, &n, TIMEOUT) < 0) {
         fprintf(stderr, "stx_dns_getaddrlist: can't resolve %s: ", host);
-        if (h_errno == NETDB_INTERNAL)
+        if (h_errno == NETDB_INTERNAL) {
             perror("");
-        else
+        } else {
             herror("");
+        }
     } else {
-        if (n > 0)
+        if (n > 0) {
             printf("%-40s %s\n", (char*)host, inet_ntoa(addrs[0]));
-        for (i = 1; i < n; i++)
+        }
+        for (i = 1; i < n; i++) {
             printf("%-40s %s\n", "", inet_ntoa(addrs[i]));
+        }
     }
 }
 
@@ -42,12 +44,11 @@ static void show_info(void) {
            (int)info.lookups, (int)info.inserts, (int)info.deletes);
 }
 
-extern stx_cache_t* _stx_dns_cache;
-
 static void printhost(void* host, void* data) {
     printf("%s\n", (char*)host);
 }
 
+extern stx_cache_t* _stx_dns_cache;
 static void show_lru(void) {
     printf("LRU hosts:\n\n");
     stx_cache_traverse_lru(_stx_dns_cache, printhost, 10);
@@ -74,12 +75,15 @@ int main() {
     for (; ;) {
         fputs("> ", stdout);
         fflush(stdout);
-        if (!fgets(line, sizeof(line), stdin))
+        if (!fgets(line, sizeof(line), stdin)) {
             break;
-        if (sscanf(line, "%s", str) != 1)
+        }
+        if (sscanf(line, "%s", str) != 1) {
             continue;
-        if (strcmp(str, "exit") == 0 || strcmp(str, "quit") == 0)
+        }
+        if (strcmp(str, "exit") == 0 || strcmp(str, "quit") == 0) {
             break;
+        }
         if (strcmp(str, "info") == 0) {
             show_info();
             continue;
@@ -96,10 +100,8 @@ int main() {
             flush_cache();
             continue;
         }
-
         do_resolve(str);
     }
-
     return 0;
 }
 

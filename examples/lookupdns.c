@@ -17,28 +17,25 @@
 #include "st.h"
 
 
-/* Resolution timeout (in microseconds) */
+// Resolution timeout (in microseconds)
 #define TIMEOUT (2*1000000LL)
 
-/* External function defined in the res.c file */
+// External function defined in the res.c file
 int dns_getaddr(const char* host, struct in_addr* addr, st_utime_t timeout) {
     return 0;
 }
 
-
 void* do_resolve(void* host) {
     struct in_addr addr;
-
-    /* Use dns_getaddr() instead of gethostbyname(3) to get IP address */
+    // Use dns_getaddr() instead of gethostbyname(3) to get IP address
     if (dns_getaddr(host, &addr, TIMEOUT) < 0) {
         fprintf(stderr, "dns_getaddr: can't resolve %s: ", (char*)host);
         perror("");
-    } else
+    } else {
         printf("%-40s %s\n", (char*)host, inet_ntoa(addr));
-
+    }
     return NULL;
 }
-
 
 /*
  * Asynchronous DNS host name resolution. This program creates one
@@ -59,7 +56,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (i = 1; i < argc; i++) {
-        /* Create a separate thread for each host name */
+        // Create a separate thread for each host name
         if (st_thread_create(do_resolve, argv[i], 0, 0) == NULL) {
             perror("st_thread_create");
             exit(1);
@@ -68,7 +65,6 @@ int main(int argc, char* argv[]) {
 
     st_thread_exit(NULL);
 
-    /* NOTREACHED */
     return 1;
 }
 
