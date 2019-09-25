@@ -23,7 +23,7 @@ int st_key_getlimit(void) {
 }
 
 int st_thread_setspecific(int key, void* value) {
-    _st_thread_t* me = _ST_CURRENT_THREAD();
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
     if (key < 0 || key >= key_max) {
         errno = EINVAL;
         return -1;
@@ -46,12 +46,13 @@ void* st_thread_getspecific(int key) {
 }
 
 // Free up all per-thread private data
-void _st_thread_cleanup(_st_thread_t* thread) {
-    int key;
-    for (key = 0; key < key_max; key++) {
-        if (thread->private_data[key] && _st_destructors[key]) {
-            (*_st_destructors[key])(thread->private_data[key]);
-            thread->private_data[key] = NULL;
+void _st_thread_cleanup(volatile _st_thread_t* thread) {
+    if (thread != NULL) {
+        for (int key = 0; key < key_max; key++) {
+            if (thread->private_data[key] && _st_destructors[key]) {
+                (*_st_destructors[key])(thread->private_data[key]);
+                thread->private_data[key] = NULL;
+            }
         }
     }
 }

@@ -12,19 +12,19 @@
 
 
 // Global data
-_st_vp_t _st_this_vp;           // This VP
-_st_thread_t* _st_this_thread;  // Current thread
-int _st_active_count = 0;       // Active thread count
+volatile _st_vp_t _st_this_vp;           // This VP
+volatile _st_thread_t* _st_this_thread;  // Current thread
+volatile int _st_active_count = 0; // Active thread count
 
-time_t _st_curr_time = 0;       // Current time as returned by time(2)
-st_utime_t _st_last_tset;       // Last time it was fetched
+volatile time_t _st_curr_time = 0;       // Current time as returned by time(2)
+volatile st_utime_t _st_last_tset;       // Last time it was fetched
 
 
 int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
     struct pollfd* pd;
     struct pollfd* epd = pds + npds;
     _st_pollq_t pq;
-    _st_thread_t* me = _ST_CURRENT_THREAD();
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
     int n;
 
     if (me->flags & _ST_FL_INTERRUPT) {
@@ -86,7 +86,9 @@ void _st_vp_schedule(void) {
 
     // Resume the thread
     thread->state = _ST_ST_RUNNING;
-    _ST_RESTORE_CONTEXT(thread);
+
+    _ST_SET_CURRENT_THREAD(thread);
+    MD_LONGJMP(thread->context, 1);
 }
 
 // Initialize this Virtual Processor
@@ -141,7 +143,7 @@ int st_init(void) {
 
 // Start function for the idle thread
 void* _st_idle_thread_start(void* arg) {
-    _st_thread_t* me = _ST_CURRENT_THREAD();
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
 
     while (_st_active_count > 0) {
         // Idle vp till I/O is ready or the smallest timeout expired
@@ -162,8 +164,7 @@ void* _st_idle_thread_start(void* arg) {
 }
 
 void st_thread_exit(void* retval) {
-    _st_thread_t* thread = _ST_CURRENT_THREAD();
-
+    volatile _st_thread_t* thread = _ST_CURRENT_THREAD();
     thread->retval = retval;
     _st_thread_cleanup(thread);
     _st_active_count--;
@@ -230,7 +231,7 @@ int st_thread_join(_st_thread_t* thread, void** retvalp) {
 }
 
 void _st_thread_main(void) {
-    _st_thread_t* thread = _ST_CURRENT_THREAD();
+    volatile _st_thread_t* thread = _ST_CURRENT_THREAD();
 
     // Cap the stack by zeroing out the saved return address register value. This allows some debugging/profiling tools
     // to know when to stop unwinding the stack. It's a no-op on most platforms.
@@ -251,7 +252,7 @@ void _st_thread_main(void) {
 
 // Insert "thread" into the timeout heap, in the position specified by thread->heap_index.
 // See docs/timeout_heap.txt for details about the timeout heap.
-static _st_thread_t** heap_insert(_st_thread_t* thread) {
+static _st_thread_t** heap_insert(volatile _st_thread_t* thread) {
     int target = thread->heap_index;
     int s = target;
     _st_thread_t** p = &_ST_SLEEPQ;
@@ -287,7 +288,7 @@ static _st_thread_t** heap_insert(_st_thread_t* thread) {
 }
 
 // Delete "thread" from the timeout heap.
-static void heap_delete(_st_thread_t* thread) {
+static void heap_delete(volatile _st_thread_t* thread) {
     _st_thread_t* t, **p;
     int bits = 0;
     int s, bit;
@@ -356,14 +357,14 @@ static void heap_delete(_st_thread_t* thread) {
     thread->left = thread->right = NULL;
 }
 
-void _st_add_sleep_q(_st_thread_t* thread, st_utime_t timeout) {
+void _st_add_sleep_q(volatile _st_thread_t* thread, st_utime_t timeout) {
     thread->due = _ST_LAST_CLOCK + timeout;
     thread->flags |= _ST_FL_ON_SLEEPQ;
     thread->heap_index = ++_ST_SLEEPQ_SIZE;
     heap_insert(thread);
 }
 
-void _st_del_sleep_q(_st_thread_t* thread) {
+void _st_del_sleep_q(volatile _st_thread_t* thread) {
     heap_delete(thread);
     thread->flags &= ~_ST_FL_ON_SLEEPQ;
 }
@@ -517,6 +518,6 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinabl
     return thread;
 }
 
-_st_thread_t* st_thread_self(void) {
+st_thread_t st_thread_self(void) {
     return _ST_CURRENT_THREAD();
 }

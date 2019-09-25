@@ -19,7 +19,7 @@
 #define ST_END_MACRO    }
 #define	ST_HIDDEN   static
 
-#include "public.h"
+#include "st.h"
 #include "md.h"
 
 
@@ -30,7 +30,7 @@ typedef struct _st_clist {
 } _st_clist_t;
 
 // Insert element "_e" into the list, before "_l"
-#define ST_INSERT_BEFORE(_e,_l) \
+#define ST_INSERT_BEFORE(_e, _l) \
     ST_BEGIN_MACRO \
     (_e)->next = (_l); \
     (_e)->prev = (_l)->prev; \
@@ -39,7 +39,7 @@ typedef struct _st_clist {
     ST_END_MACRO
 
 // Insert element "_e" into the list, after "_l"
-#define ST_INSERT_AFTER(_e,_l) \
+#define ST_INSERT_AFTER(_e, _l) \
     ST_BEGIN_MACRO \
     (_e)->next = (_l)->next; \
     (_e)->prev = (_l); \
@@ -89,8 +89,8 @@ typedef void (*_st_destructor_t)(void*);
 typedef struct _st_stack {
     _st_clist_t links;
     char* vaddr;                // Base of stack's allocated memory
-    int  vaddr_size;            // Size of stack's allocated memory
-    int  stk_size;              // Size of usable portion of the stack
+    int vaddr_size;             // Size of stack's allocated memory
+    int stk_size;               // Size of usable portion of the stack
     char* stk_bottom;           // Lowest address of stack's usable portion
     char* stk_top;              // Highest address of stack's usable portion
     void* sp;                   // Stack pointer from C's point of view
@@ -140,13 +140,13 @@ struct _st_thread {
 
 typedef struct _st_mutex {
     _st_thread_t* owner;        // Current mutex owner
-    _st_clist_t  wait_q;        // Mutex wait queue
+    _st_clist_t wait_q;         // Mutex wait queue
 } _st_mutex_t;
 
 
 typedef struct _st_pollq {
     _st_clist_t links;          // For putting on io queue
-    _st_thread_t*  thread;      // Polling thread
+    _st_thread_t* thread;       // Polling thread
     struct pollfd* pds;         // Array of poll descriptors
     int npds;                   // Length of the array
     int on_ioq;                 // Is it on ioq?
@@ -155,7 +155,7 @@ typedef struct _st_pollq {
 
 typedef struct _st_eventsys_ops {
     const char* name;                          // Name of this event system
-    int  val;                                  // Type of this event system
+    int val;                                   // Type of this event system
     int (*init)(void);                         // Initialization
     void (*dispatch)(void);                    // Dispatch function
     int (*pollset_add)(struct pollfd*, int);   // Add descriptor set
@@ -192,25 +192,25 @@ typedef struct _st_netfd {
 
 
 // Current vp, thread, and event system
-extern _st_vp_t _st_this_vp;
-extern _st_thread_t* _st_this_thread;
-extern _st_eventsys_t* _st_eventsys;
+extern volatile _st_vp_t _st_this_vp;
+extern volatile _st_thread_t* _st_this_thread;
+extern volatile _st_eventsys_t* _st_eventsys;
 
-#define _ST_CURRENT_THREAD()            (_st_this_thread)
+#define _ST_CURRENT_THREAD() (_st_this_thread)
 #define _ST_SET_CURRENT_THREAD(_thread) (_st_this_thread = (_thread))
 
-#define _ST_LAST_CLOCK                  (_st_this_vp.last_clock)
+#define _ST_LAST_CLOCK  (_st_this_vp.last_clock)
 
-#define _ST_RUNQ                        (_st_this_vp.run_q)
-#define _ST_IOQ                         (_st_this_vp.io_q)
-#define _ST_ZOMBIEQ                     (_st_this_vp.zombie_q)
+#define _ST_RUNQ        (_st_this_vp.run_q)
+#define _ST_IOQ         (_st_this_vp.io_q)
+#define _ST_ZOMBIEQ     (_st_this_vp.zombie_q)
 
-#define _ST_PAGE_SIZE                   (_st_this_vp.pagesize)
+#define _ST_PAGE_SIZE   (_st_this_vp.pagesize)
 
-#define _ST_SLEEPQ                      (_st_this_vp.sleep_q)
-#define _ST_SLEEPQ_SIZE                 (_st_this_vp.sleepq_size)
+#define _ST_SLEEPQ      (_st_this_vp.sleep_q)
+#define _ST_SLEEPQ_SIZE (_st_this_vp.sleepq_size)
 
-#define _ST_VP_IDLE()                   (*_st_eventsys->dispatch)()
+#define _ST_VP_IDLE()   (*_st_eventsys->dispatch)()
 
 
 // vp queues operations
@@ -279,33 +279,17 @@ extern _st_eventsys_t* _st_eventsys;
 #define ST_MIN_POLLFDS_SIZE 64
 #endif
 
-// Switch away from the current thread context by saving its state and calling the thread scheduler
-#define _ST_SWITCH_CONTEXT(_thread) \
-    ST_BEGIN_MACRO \
-    if (!MD_SETJMP((_thread)->context)) { \
-        _st_vp_schedule(); \
-    } \
-    ST_END_MACRO
-
-// Restore a thread context that was saved by _ST_SWITCH_CONTEXT
-#define _ST_RESTORE_CONTEXT(_thread) \
-    ST_BEGIN_MACRO \
-    _ST_SET_CURRENT_THREAD(_thread); \
-    MD_LONGJMP((_thread)->context, 1); \
-    ST_END_MACRO
-
 // Number of bytes reserved under the stack "bottom"
 #define _ST_STACK_PAD_SIZE MD_STACK_PAD_SIZE
-
 
 // Forward declarations
 void _st_vp_schedule(void);
 void _st_vp_check_clock(void);
 void* _st_idle_thread_start(void* arg);
 void _st_thread_main(void);
-void _st_thread_cleanup(_st_thread_t* thread);
-void _st_add_sleep_q(_st_thread_t* thread, st_utime_t timeout);
-void _st_del_sleep_q(_st_thread_t* thread);
+void _st_thread_cleanup(volatile _st_thread_t* thread);
+void _st_add_sleep_q(volatile _st_thread_t* thread, st_utime_t timeout);
+void _st_del_sleep_q(volatile _st_thread_t* thread);
 _st_stack_t* _st_stack_new(int stack_size);
 void _st_stack_free(_st_stack_t* ts);
 int _st_io_init(void);

@@ -3,9 +3,9 @@
 #include <errno.h>
 #include "common.h"
 
-extern time_t _st_curr_time;
-extern st_utime_t _st_last_tset;
-extern int _st_active_count;
+extern volatile time_t _st_curr_time;
+extern volatile st_utime_t _st_last_tset;
+extern volatile int _st_active_count;
 
 static st_utime_t (*_st_utime)(void) = NULL;
 
@@ -54,7 +54,7 @@ time_t st_time(void) {
 }
 
 int st_usleep(st_utime_t usecs) {
-    _st_thread_t* me = _ST_CURRENT_THREAD();
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
     if (me->flags & _ST_FL_INTERRUPT) {
         me->flags &= ~_ST_FL_INTERRUPT;
         errno = EINTR;
@@ -102,7 +102,7 @@ int st_cond_destroy(_st_cond_t* cvar) {
 }
 
 int st_cond_timedwait(_st_cond_t* cvar, st_utime_t timeout) {
-    _st_thread_t* me = _ST_CURRENT_THREAD();
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
     int rv;
     if (me->flags & _ST_FL_INTERRUPT) {
         me->flags &= ~_ST_FL_INTERRUPT;
@@ -189,7 +189,7 @@ int st_mutex_destroy(_st_mutex_t* lock) {
 }
 
 int st_mutex_lock(_st_mutex_t* lock) {
-    _st_thread_t* me = _ST_CURRENT_THREAD();
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
     if (me->flags & _ST_FL_INTERRUPT) {
         me->flags &= ~_ST_FL_INTERRUPT;
         errno = EINTR;

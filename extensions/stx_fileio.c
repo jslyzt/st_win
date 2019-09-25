@@ -16,7 +16,7 @@ typedef struct {
     ssize_t nbytes;
 } file_reader_cb_t;
 
-/**
+/*
  * Fork a process to read a file and return its pid.  Receives
  * offset/length commands from control stream and sends corresponding data
  * to out stream.  A zero length on the control stream signals an end.
@@ -118,7 +118,7 @@ static fileio_data_t* get_fileio_data(st_netfd_t fd) {
     return dat;
 }
 
-/**
+/*
  * Read data from the specified section of a file.  Uses a forked
  * file_reader process to do the actual reading so as to avoid causing all
  * State Threads to block.

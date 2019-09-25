@@ -28,16 +28,17 @@
 #define MD_GET_SP(_t) (_t)->context[MD_JB_SP]
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  MD_GET_SP(_thread) = (long) (_sp); \
-  ST_END_MACRO
+    ST_BEGIN_MACRO \
+    if (MD_SETJMP((_thread)->context)) { \
+        _main(); \
+    } \
+    MD_GET_SP(_thread) = (long) (_sp); \
+    ST_END_MACRO
 
 #define MD_GET_UTIME() \
-  struct timeval tv; \
-  (void) gettimeofday(&tv, NULL); \
-  return (tv.tv_sec * 1000000LL + tv.tv_usec)
+    struct timeval tv; \
+    (void) gettimeofday(&tv, NULL); \
+    return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
 #elif defined (WIN32)
 #include <setjmp.h>
@@ -59,14 +60,23 @@ int _st_GetError(int err);
 
 #define MD_SETJMP(env)
 #define MD_LONGJMP(env, val) \
+    ST_BEGIN_MACRO \
     if (env != NULL) { \
         SwitchToFiber(env); \
-    }
+    } \
+    ST_END_MACRO
 
 #define MD_GET_UTIME() \
   struct _timeb tb; \
   _ftime(&tb); \
   return((tb.time*1000000)+(tb.millitm*1000));
+
+#define _ST_SWITCH_CONTEXT(thd) \
+    ST_BEGIN_MACRO \
+    if((thd)->context != NULL) { \
+        SwitchToFiber((thd)->context); \
+    } \
+    ST_END_MACRO
 
 #elif defined (DARWIN)
 
@@ -90,16 +100,17 @@ int _st_GetError(int err);
 #endif
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  *((long *)&((_thread)->context[MD_JB_SP])) = (long) (_sp); \
-  ST_END_MACRO
+    ST_BEGIN_MACRO \
+    if (MD_SETJMP((_thread)->context)) { \
+        _main(); \
+    } \
+    *((long *)&((_thread)->context[MD_JB_SP])) = (long) (_sp); \
+    ST_END_MACRO
 
 #define MD_GET_UTIME() \
-  struct timeval tv; \
-  (void) gettimeofday(&tv, NULL); \
-  return (tv.tv_sec * 1000000LL + tv.tv_usec)
+    struct timeval tv; \
+    (void) gettimeofday(&tv, NULL); \
+    return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
 #elif defined (FREEBSD)
 
@@ -122,17 +133,17 @@ int _st_GetError(int err);
 #endif
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) { \
-    _main(); \
-  } \
-  (_thread)->context[0]._jb[MD_JB_SP] = (long) (_sp); \
-  ST_END_MACRO
+    ST_BEGIN_MACRO \
+    if (MD_SETJMP((_thread)->context)) { \
+        _main(); \
+    } \
+    (_thread)->context[0]._jb[MD_JB_SP] = (long) (_sp); \
+    ST_END_MACRO
 
 #define MD_GET_UTIME() \
-  struct timeval tv; \
-  (void) gettimeofday(&tv, NULL); \
-  return (tv.tv_sec * 1000000LL + tv.tv_usec)
+    struct timeval tv; \
+    (void) gettimeofday(&tv, NULL); \
+    return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
 #elif defined (LINUX)
 
@@ -146,9 +157,9 @@ int _st_GetError(int err);
 
 // All architectures and flavors of linux have the gettimeofday function but if you know of a faster way, use it.
 #define MD_GET_UTIME() \
-  struct timeval tv; \
-  (void) gettimeofday(&tv, NULL); \
-  return (tv.tv_sec * 1000000LL + tv.tv_usec)
+    struct timeval tv; \
+    (void) gettimeofday(&tv, NULL); \
+    return (tv.tv_sec * 1000000LL + tv.tv_usec)
 
 #if defined(__ia64__)
 #define MD_STACK_GROWS_DOWN
@@ -169,25 +180,26 @@ int _st_GetError(int err);
 
 // Last register stack frame must be preserved
 #define MD_INIT_CONTEXT(_thread, _sp, _bsp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  memcpy((char *)(_bsp) - MD_STACK_PAD_SIZE, \
-         (char *)(_thread)->context[0].__jmpbuf[17] - MD_STACK_PAD_SIZE, \
-         MD_STACK_PAD_SIZE); \
-  (_thread)->context[0].__jmpbuf[0]  = (long) (_sp); \
-  (_thread)->context[0].__jmpbuf[17] = (long) (_bsp); \
-  ST_END_MACRO
+    ST_BEGIN_MACRO \
+    if (MD_SETJMP((_thread)->context)) { \
+        _main(); \
+    } \
+    memcpy((char *)(_bsp) - MD_STACK_PAD_SIZE, \
+            (char *)(_thread)->context[0].__jmpbuf[17] - MD_STACK_PAD_SIZE, \
+            MD_STACK_PAD_SIZE); \
+    (_thread)->context[0].__jmpbuf[0]  = (long) (_sp); \
+    (_thread)->context[0].__jmpbuf[17] = (long) (_bsp); \
+    ST_END_MACRO
 
 #elif defined(__mips__)
 #define MD_STACK_GROWS_DOWN
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  MD_SETJMP((_thread)->context); \
-  _thread->context[0].__jmpbuf[0].__pc = (__ptr_t) _main;  \
-  _thread->context[0].__jmpbuf[0].__sp = _sp; \
-  ST_END_MACRO
+    ST_BEGIN_MACRO \
+    MD_SETJMP((_thread)->context); \
+    _thread->context[0].__jmpbuf[0].__pc = (__ptr_t) _main;  \
+    _thread->context[0].__jmpbuf[0].__sp = _sp; \
+    ST_END_MACRO
 
 #else
 
@@ -294,11 +306,12 @@ int _st_GetError(int err);
 #endif
 
 #define MD_INIT_CONTEXT(_thread, _sp, _main) \
-  ST_BEGIN_MACRO \
-  if (MD_SETJMP((_thread)->context)) \
-    _main(); \
-  MD_GET_SP(_thread) = (long) (_sp); \
-  ST_END_MACRO
+    ST_BEGIN_MACRO \
+    if (MD_SETJMP((_thread)->context)) { \
+        _main(); \
+    } \
+    MD_GET_SP(_thread) = (long) (_sp); \
+    ST_END_MACRO
 
 #endif
 
@@ -329,4 +342,14 @@ extern void _st_md_cxt_restore(jmp_buf env, int val);
 
 #ifndef MD_CAP_STACK
 #define MD_CAP_STACK(var_addr)
+#endif
+
+// Switch away from the current thread context by saving its state and calling the thread scheduler
+#ifndef _ST_SWITCH_CONTEXT
+#define _ST_SWITCH_CONTEXT(_thread) \
+    ST_BEGIN_MACRO \
+    if (!MD_SETJMP((_thread)->context)) { \
+        _st_vp_schedule(); \
+    } \
+    ST_END_MACRO
 #endif

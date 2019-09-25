@@ -120,7 +120,7 @@ static struct _st_epolldata {
 
 #endif
 
-_st_eventsys_t* _st_eventsys = NULL;
+volatile _st_eventsys_t* _st_eventsys = NULL;
 
 
 // select event system

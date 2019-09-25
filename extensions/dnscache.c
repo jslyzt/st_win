@@ -25,7 +25,7 @@ static unsigned long hash_hostname(const void* key) {
     const char* name = (const char*)key;
     unsigned long hash = 0;
     while (*name) {
-        hash = (hash << 4) - hash + *name++; /* hash = hash * 15 + *name++ */
+        hash = (hash << 4) - hash + *name++; // hash = hash * 15 + *name++
     }
     return hash;
 }

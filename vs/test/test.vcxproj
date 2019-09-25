@@ -11,8 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\examples\lookupdns.c" />
-    <ClCompile Include="..\..\examples\test.c" />
+    <ClCompile Include="..\..\examples\lookupdns.cpp" />
+    <ClCompile Include="..\..\examples\test.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{271F5A3B-4416-4CE7-902A-23E9501D9E2C}</ProjectGuid>

@@ -1,17 +1,17 @@
 #if 0
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <setjmp.h>
+#include <iostream>
 
 jmp_buf context_level_0;
 
 void func_level_0() {
     const char* level_0_0 = "stack variables for func_level_0";
     int ret = setjmp(context_level_0);
-    printf("func_level_0 ret=%d\n", ret);
+    std::cout << "func_level_0 ret=" << ret << std::endl;
     if (ret != 0) {
-        printf("call by longjmp.\n");
+        std::cout << "call by longjmp." << std::endl;
         exit(0);
     }
 }
