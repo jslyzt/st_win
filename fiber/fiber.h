@@ -13,7 +13,8 @@ extern "C" {
     void delFiberSG(void* sg);
 
     void* createFiber(fn_t fn, intptr_t vp, uint64_t stackSize);
-    void swapFiber(void* ctx, int stop);
+    void swapFiber(void* ctx);
+    void swapOutFiber();
     void delFiber(void* ctx);
 
 #ifdef __cplusplus

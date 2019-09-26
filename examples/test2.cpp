@@ -1,4 +1,4 @@
-#if 1
+#if 0
 
 #include <iostream>
 #include <functional>
@@ -7,11 +7,7 @@
 
 void runstr(const char* str) {
     std::cout << str << std::endl;
-
-    auto& ctx = FiberSG::CurrentContext();
-    if (ctx != nullptr) {
-        ctx->SwapOut();
-    }
+    swapOutFiber();
 }
 
 void run(intptr_t) {
@@ -30,7 +26,7 @@ int main(int argc, char** argv) {
     ctx.SwapIn();
 
     auto ptr = createFiber(&runptr, 0, 1 * 1024 * 1024);
-    swapFiber(ptr, 0);
+    swapFiber(ptr);
 
     delFiberSG(sg);
 

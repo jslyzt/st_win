@@ -25,7 +25,7 @@ void* createFiber(fn_t fn, intptr_t vp, uint64_t stackSize) {
     return ctx;
 }
 
-void swapFiber(void* ctx, int stop) {
+void swapFiber(void* ctx) {
     if (ctx == nullptr) {
         return;
     }
@@ -33,11 +33,11 @@ void swapFiber(void* ctx, int stop) {
     if (cnt == nullptr) {
         return;
     }
-    if (stop > 0) {
-        cnt->SwapOut();
-    } else {
-        cnt->SwapIn();
-    }
+    cnt->SwapIn();
+}
+
+void swapOutFiber() {
+    Context::SwapOut();
 }
 
 void delFiber(void* ctx) {

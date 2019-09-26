@@ -1,4 +1,4 @@
-#if 0
+#if 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    st_idle_thread_start();
+    st_idle_thread_run();
 
     return 1;
 }

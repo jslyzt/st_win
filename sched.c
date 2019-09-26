@@ -84,17 +84,15 @@ void _st_vp_schedule(void) {
     // Resume the thread
     thread->state = _ST_ST_RUNNING;
     _ST_SET_CURRENT_THREAD(thread);
-    //MD_LONGJMP(thread->context, 1);
     if (thread->context != NULL) {
-        swapFiber(thread->context, 0);
+        swapFiber(thread->context);
     }
 }
 
 // Initialize this Virtual Processor
 int st_init(void) {
     _st_thread_t* thread;
-    if (_st_active_count) {
-        // Already initialized
+    if (_st_active_count > 0) {
         return 0;
     }
 
@@ -115,25 +113,13 @@ int st_init(void) {
     _st_this_vp.pagesize = getpagesize();
     _st_this_vp.last_clock = st_utime();
 
-    _st_active_count--;
-
-    // Initialize primordial thread
-    thread = (_st_thread_t*) calloc(1, sizeof(_st_thread_t) + (ST_KEYS_MAX * sizeof(void*)));
-    if (!thread) {
-        return -1;
-    }
-    thread->private_data = (void**)(thread + 1);
-    thread->state = _ST_ST_RUNNING;
-    thread->flags = _ST_FL_PRIMORDIAL;
-    _ST_SET_CURRENT_THREAD(thread);
-    _st_active_count++;
-
     return 0;
 }
 
 // Start function for the idle thread
-void* _st_idle_thread_start(void* arg) {
-    volatile _st_thread_t* me = NULL;
+void _st_idle_thread_run() {
+
+    auto sg = createFiberSG();
 
     while (_st_active_count > 0) {
         // Idle vp till I/O is ready or the smallest timeout expired
@@ -145,11 +131,7 @@ void* _st_idle_thread_start(void* arg) {
         _st_vp_schedule();
     }
 
-    // No more threads
-    exit(0);
-
-    // NOTREACHED
-    return NULL;
+    delFiberSG(sg);
 }
 
 void st_thread_exit(void* retval) {
@@ -217,26 +199,6 @@ int st_thread_join(_st_thread_t* thread, void** retvalp) {
     _ST_ADD_RUNQ(thread);
 
     return 0;
-}
-
-void _st_thread_main(void) {
-    volatile _st_thread_t* thread = _ST_CURRENT_THREAD();
-
-    // Cap the stack by zeroing out the saved return address register value. This allows some debugging/profiling tools
-    // to know when to stop unwinding the stack. It's a no-op on most platforms.
-    MD_CAP_STACK(&thread);
-
-    // Run thread main
-#ifdef MD_INIT_CONTEXT
-    thread->retval = (*thread->start)(thread->arg);
-#else
-    if (thread->context != NULL) {
-        swapFiber(thread->context, 0);
-    }
-#endif
-
-    // All done, time to go away
-    st_thread_exit(thread->retval);
 }
 
 // Insert "thread" into the timeout heap, in the position specified by thread->heap_index.
@@ -406,6 +368,18 @@ void st_thread_interrupt(_st_thread_t* thread) {
     _ST_ADD_RUNQ(thread);
 }
 
+void _st_thread_main(intptr_t ptr) {
+    _st_thread_t* thd = (_st_thread_t*)ptr;
+    if (thd == NULL) {
+        return;
+    }
+    if (thd->start != NULL) {
+        thd->start(thd->arg);
+    }
+    st_thread_exit(thd->retval);
+    swapOutFiber();
+}
+
 _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinable, int stk_size) {
     _st_thread_t* thread;
     _st_stack_t* stack;
@@ -475,18 +449,10 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinabl
     // Initialize thread
     thread->private_data = ptds;
     thread->stack = stack;
-
-#ifdef MD_INIT_CONTEXT
     thread->start = start;
     thread->arg = arg;
-#ifdef __ia64__
-    MD_INIT_CONTEXT(thread, stack->sp, stack->bsp, _st_thread_main);
-#else
-    MD_INIT_CONTEXT(thread, stack->sp, _st_thread_main);
-#endif
-#else
-    thread->context = createFiber(start, arg, 1 * 1024 * 1024);
-#endif
+
+    thread->context = createFiber(_st_thread_main, (intptr_t)thread, 1 * 1024 * 1024);
 
     // If thread is joinable, allocate a termination condition variable
     if (joinable) {
@@ -509,6 +475,6 @@ st_thread_t st_thread_self(void) {
     return _ST_CURRENT_THREAD();
 }
 
-void st_idle_thread_start() {
-    _st_idle_thread_start(NULL);
+void st_idle_thread_run() {
+    _st_idle_thread_run();
 }

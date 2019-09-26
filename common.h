@@ -111,10 +111,8 @@ struct _st_thread {
     int state;                  // Thread's state
     int flags;                  // Thread's flags
 
-#ifdef MD_INIT_CONTEXT
     void* (*start)(void* arg);  // The start function of the thread
     void* arg;                  // Argument of the start function
-#endif
     void* retval;               // Return value of the start function
 
     _st_stack_t* stack;         // Info about thread's stack
@@ -284,8 +282,7 @@ extern volatile _st_eventsys_t* _st_eventsys;
 // Forward declarations
 void _st_vp_schedule(void);
 void _st_vp_check_clock(void);
-void* _st_idle_thread_start(void* arg);
-void _st_thread_main(void);
+void _st_idle_thread_run();
 void _st_thread_cleanup(volatile _st_thread_t* thread);
 void _st_add_sleep_q(volatile _st_thread_t* thread, st_utime_t timeout);
 void _st_del_sleep_q(volatile _st_thread_t* thread);

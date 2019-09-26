@@ -62,7 +62,7 @@ void st_thread_interrupt(st_thread_t thread);
 st_thread_t st_thread_create(void* (*start)(void* arg), void* arg, int joinable, int stack_size);
 int st_randomize_stacks(int on);
 int st_set_utime_function(st_utime_t (*func)(void));
-void st_idle_thread_start();
+void st_idle_thread_run();
 
 st_utime_t st_utime(void);
 st_utime_t st_utime_last_clock(void);
@@ -84,8 +84,8 @@ int st_mutex_trylock(st_mutex_t lock);
 
 int st_key_create(int* keyp, void (*destructor)(void*));
 int st_key_getlimit(void);
-int st_thread_setspecific(int key, void* value);
-void* st_thread_getspecific(int key);
+int st_thread_setspecific(st_thread_t thread, int key, void* value);
+void* st_thread_getspecific(st_thread_t thread, int key);
 
 st_netfd_t st_netfd_open(int osfd);
 st_netfd_t st_netfd_open_socket(int osfd);

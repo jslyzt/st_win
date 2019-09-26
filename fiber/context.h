@@ -42,14 +42,20 @@ public:
         DeleteFiber(ctx_);
     }
 
-    inline void SwapIn() {
-        FiberSG::CurrentContext() = this;
+    void SwapIn() {
+        auto& sg = FiberSG::CurrentContext();
+        if (sg != this) {
+            sg = this;
+        }
         SwitchToFiber(ctx_);
     }
 
-    inline void SwapOut() {
-        FiberSG::CurrentContext() = nullptr;
-        SwitchToFiber(FiberSG::GetTlsContext());
+    static void SwapOut() {
+        auto& sg = FiberSG::CurrentContext();
+        if (sg != nullptr) {
+            sg = nullptr;
+            SwitchToFiber(FiberSG::GetTlsContext());
+        }
     }
 
     inline void* getCtx() {
