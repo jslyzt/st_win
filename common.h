@@ -167,7 +167,6 @@ typedef struct _st_eventsys_ops {
 
 
 typedef struct _st_vp {
-    _st_thread_t* idle_thread;  // Idle thread for this vp
     st_utime_t last_clock;      // The last time we went into vp_check_clock()
 
     _st_clist_t run_q;          // run queue for this vp

@@ -9,11 +9,16 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "test\test.vcxproj",
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "st", "st\st.vcxproj", "{EF8256F2-7862-4AEF-87A2-3C0D56278D2A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C5C920A6-7E5F-300E-6AC2-F6838C544FEF} = {C5C920A6-7E5F-300E-6AC2-F6838C544FEF}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ext", "ext\ext.vcxproj", "{AAB7E369-1D8E-56DB-EBE8-C22E116A21F4}"
 	ProjectSection(ProjectDependencies) = postProject
 		{EF8256F2-7862-4AEF-87A2-3C0D56278D2A} = {EF8256F2-7862-4AEF-87A2-3C0D56278D2A}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fiber", "fiber\fiber.vcxproj", "{C5C920A6-7E5F-300E-6AC2-F6838C544FEF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,6 +37,10 @@ Global
 		{AAB7E369-1D8E-56DB-EBE8-C22E116A21F4}.Debug|x64.ActiveCfg = Debug|x64
 		{AAB7E369-1D8E-56DB-EBE8-C22E116A21F4}.Release|x64.ActiveCfg = Release|x64
 		{AAB7E369-1D8E-56DB-EBE8-C22E116A21F4}.Release|x64.Build.0 = Release|x64
+		{C5C920A6-7E5F-300E-6AC2-F6838C544FEF}.Debug|x64.ActiveCfg = Debug|x64
+		{C5C920A6-7E5F-300E-6AC2-F6838C544FEF}.Debug|x64.Build.0 = Debug|x64
+		{C5C920A6-7E5F-300E-6AC2-F6838C544FEF}.Release|x64.ActiveCfg = Release|x64
+		{C5C920A6-7E5F-300E-6AC2-F6838C544FEF}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

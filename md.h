@@ -62,7 +62,7 @@ int _st_GetError(int err);
 #define MD_LONGJMP(env, val) \
     ST_BEGIN_MACRO \
     if (env != NULL) { \
-        SwitchToFiber(env); \
+        swapFiber(env, 0); \
     } \
     ST_END_MACRO
 
@@ -74,7 +74,7 @@ int _st_GetError(int err);
 #define _ST_SWITCH_CONTEXT(thd) \
     ST_BEGIN_MACRO \
     if((thd)->context != NULL) { \
-        SwitchToFiber((thd)->context); \
+        swapFiber((thd)->context, 0); \
     } \
     ST_END_MACRO
 

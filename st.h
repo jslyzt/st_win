@@ -62,6 +62,7 @@ void st_thread_interrupt(st_thread_t thread);
 st_thread_t st_thread_create(void* (*start)(void* arg), void* arg, int joinable, int stack_size);
 int st_randomize_stacks(int on);
 int st_set_utime_function(st_utime_t (*func)(void));
+void st_idle_thread_start();
 
 st_utime_t st_utime(void);
 st_utime_t st_utime_last_clock(void);

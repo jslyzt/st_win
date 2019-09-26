@@ -9,6 +9,7 @@
 #include <time.h>
 #include <errno.h>
 #include "common.h"
+#include "fiber.h"
 
 
 // Global data
@@ -72,29 +73,26 @@ int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
 }
 
 void _st_vp_schedule(void) {
-    _st_thread_t* thread;
-
+    _st_thread_t* thread = NULL;
     if (_ST_RUNQ.next != &_ST_RUNQ) {
-        // Pull thread off of the run queue
         thread = _ST_THREAD_PTR(_ST_RUNQ.next);
         _ST_DEL_RUNQ(thread);
-    } else {
-        // If there are no threads to run, switch to the idle thread
-        thread = _st_this_vp.idle_thread;
     }
-    ST_ASSERT(thread->state == _ST_ST_RUNNABLE);
-
+    if (thread == NULL || thread->state != _ST_ST_RUNNABLE) {
+        return;
+    }
     // Resume the thread
     thread->state = _ST_ST_RUNNING;
-
     _ST_SET_CURRENT_THREAD(thread);
-    MD_LONGJMP(thread->context, 1);
+    //MD_LONGJMP(thread->context, 1);
+    if (thread->context != NULL) {
+        swapFiber(thread->context, 0);
+    }
 }
 
 // Initialize this Virtual Processor
 int st_init(void) {
     _st_thread_t* thread;
-
     if (_st_active_count) {
         // Already initialized
         return 0;
@@ -102,7 +100,6 @@ int st_init(void) {
 
     // We can ignore return value here
     st_set_eventsys(ST_EVENTSYS_DEFAULT);
-
     if (_st_io_init() < 0) {
         return -1;
     }
@@ -118,14 +115,7 @@ int st_init(void) {
     _st_this_vp.pagesize = getpagesize();
     _st_this_vp.last_clock = st_utime();
 
-    // Create idle thread
-    _st_this_vp.idle_thread = st_thread_create(_st_idle_thread_start, NULL, 0, 0);
-    if (!_st_this_vp.idle_thread) {
-        return -1;
-    }
-    _st_this_vp.idle_thread->flags = _ST_FL_IDLE_THREAD;
     _st_active_count--;
-    _ST_DEL_RUNQ(_st_this_vp.idle_thread);
 
     // Initialize primordial thread
     thread = (_st_thread_t*) calloc(1, sizeof(_st_thread_t) + (ST_KEYS_MAX * sizeof(void*)));
@@ -143,7 +133,7 @@ int st_init(void) {
 
 // Start function for the idle thread
 void* _st_idle_thread_start(void* arg) {
-    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
+    volatile _st_thread_t* me = NULL;
 
     while (_st_active_count > 0) {
         // Idle vp till I/O is ready or the smallest timeout expired
@@ -152,8 +142,7 @@ void* _st_idle_thread_start(void* arg) {
         // Check sleep queue for expired threads
         _st_vp_check_clock();
 
-        me->state = _ST_ST_RUNNABLE;
-        _ST_SWITCH_CONTEXT(me);
+        _st_vp_schedule();
     }
 
     // No more threads
@@ -242,7 +231,7 @@ void _st_thread_main(void) {
     thread->retval = (*thread->start)(thread->arg);
 #else
     if (thread->context != NULL) {
-        SwitchToFiber(thread->context);
+        swapFiber(thread->context, 0);
     }
 #endif
 
@@ -496,9 +485,7 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinabl
     MD_INIT_CONTEXT(thread, stack->sp, _st_thread_main);
 #endif
 #else
-    SIZE_T commit_size = 4 * 1024;
-    SIZE_T stack_size = 1 * 1024 * 1024;
-    thread->context = CreateFiberEx(commit_size, stack_size, FIBER_FLAG_FLOAT_SWITCH, (LPFIBER_START_ROUTINE)start, (LPVOID)arg);
+    thread->context = createFiber(start, arg, 1 * 1024 * 1024);
 #endif
 
     // If thread is joinable, allocate a termination condition variable
@@ -520,4 +507,8 @@ _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinabl
 
 st_thread_t st_thread_self(void) {
     return _ST_CURRENT_THREAD();
+}
+
+void st_idle_thread_start() {
+    _st_idle_thread_start(NULL);
 }

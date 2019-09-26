@@ -3,8 +3,8 @@
 #include "common.h"
 
 // Destructor table for per-thread private data
-static _st_destructor_t _st_destructors[ST_KEYS_MAX];
-static int key_max = 0;
+static volatile _st_destructor_t _st_destructors[ST_KEYS_MAX];
+static volatile int key_max = 0;
 
 // Return a key to be used for thread specific data
 int st_key_create(int* keyp, _st_destructor_t destructor) {
