@@ -5,10 +5,8 @@
 #include <context.h>
 #include <fiber.h>
 
-typedef std::function<void()> TaskF;
-
-void run() {
-    std::cout << "call by longjmp." << std::endl;
+void runstr(const char* str) {
+    std::cout << str << std::endl;
 
     auto& ctx = FiberSG::CurrentContext();
     if (ctx != nullptr) {
@@ -16,18 +14,25 @@ void run() {
     }
 }
 
+void run(intptr_t) {
+    runstr("call by SwitchToFiber");
+}
+
 void runptr(intptr_t) {
-    run();
+    runstr("call by swapFiber");
 }
 
 int main(int argc, char** argv) {
-    FiberSG sg;
+    //FiberSG sg;
+    auto sg = createFiberSG();
 
-    Context ctx(&runptr, 0, 1 * 1024 * 1024);
+    Context ctx(&run, 0, 1 * 1024 * 1024);
     ctx.SwapIn();
 
     auto ptr = createFiber(&runptr, 0, 1 * 1024 * 1024);
     swapFiber(ptr, 0);
+
+    delFiberSG(sg);
 
     return 0;
 }

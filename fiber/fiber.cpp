@@ -1,6 +1,21 @@
 #include "fiber.h"
 #include "context.h"
 
+void* createFiberSG() {
+    return new FiberSG();
+}
+
+void delFiberSG(void* sg) {
+    if (sg == nullptr) {
+        return;
+    }
+    FiberSG* fsg = static_cast<FiberSG*>(sg);
+    if (fsg == nullptr) {
+        return;
+    }
+    delete fsg;
+}
+
 void* createFiber(fn_t fn, intptr_t vp, uint64_t stackSize) {
     auto ctx = new Context(fn, vp, stackSize);
     if (ctx != nullptr && ctx->getCtx() == nullptr) {
