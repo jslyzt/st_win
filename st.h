@@ -1,17 +1,5 @@
 #pragma once
 
-#ifndef WIN32
-#include <unistd.h>
-#include <sys/socket.h>
-#include <sys/uio.h>
-#include <poll.h>
-#else
-#include <WinSock2.h>
-#endif
-#include <sys/types.h>
-#include <time.h>
-#include <errno.h>
-
 #ifdef WIN32
 typedef long long ssize_t;
 typedef int mode_t;
@@ -20,10 +8,6 @@ typedef int mode_t;
 #define ST_VERSION          "1.9"
 #define ST_VERSION_MAJOR    1
 #define ST_VERSION_MINOR    9
-
-#ifndef ETIME
-#define ETIME ETIMEDOUT
-#endif
 
 #ifndef ST_UTIME_NO_TIMEOUT
 #define ST_UTIME_NO_TIMEOUT ((st_utime_t) -1LL)
