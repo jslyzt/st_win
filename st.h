@@ -3,6 +3,14 @@
 #ifdef WIN32
 typedef long long ssize_t;
 typedef int mode_t;
+
+#ifndef WIN_IOVEC
+#define WIN_IOVEC
+struct iovec {
+    void*  iov_base;
+    size_t iov_len;
+};
+#endif
 #endif
 
 #define ST_VERSION          "1.9"
@@ -87,6 +95,9 @@ int st_connect(st_netfd_t fd, const struct sockaddr* addr, int addrlen, st_utime
 ssize_t st_read(st_netfd_t fd, void* buf, size_t nbyte, st_utime_t timeout);
 ssize_t st_read_fully(st_netfd_t fd, void* buf, size_t nbyte, st_utime_t timeout);
 ssize_t st_write(st_netfd_t fd, const void* buf, size_t nbyte, st_utime_t timeout);
+int st_write_resid(st_netfd_t fd, const void *buf, size_t *resid, st_utime_t timeout);
+ssize_t st_writev(st_netfd_t fd, const struct iovec *iov, int iov_size, st_utime_t timeout);
+int st_writev_resid(st_netfd_t fd, struct iovec **iov, int *iov_size, st_utime_t timeout);
 int st_recvfrom(st_netfd_t fd, void* buf, int len, struct sockaddr* from, int* fromlen, st_utime_t timeout);
 int st_sendto(st_netfd_t fd, const void* msg, int len, const struct sockaddr* to, int tolen, st_utime_t timeout);
 st_netfd_t st_open(const char* path, int oflags, mode_t mode);

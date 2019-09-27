@@ -360,6 +360,19 @@ ssize_t st_read_fully(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeo
     return (ssize_t)(nbyte - nleft);
 }
 
+int st_write_resid(_st_netfd_t* fd, const void* buf, size_t* resid, st_utime_t timeout) {
+    struct iovec iov, *riov;
+    int riov_size, rv;
+
+    iov.iov_base = (void*)buf;
+    iov.iov_len = *resid;
+    riov = &iov;
+    riov_size = 1;
+    rv = st_writev_resid(fd, &riov, &riov_size, timeout);
+    *resid = iov.iov_len;
+    return rv;
+}
+
 ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t timeout) {
     ssize_t n;
     size_t nleft = nbyte;
@@ -386,6 +399,19 @@ ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t time
         }
     }
     return (ssize_t)nbyte;
+}
+
+ssize_t st_writev(_st_netfd_t* fd, const struct iovec* iov, int iov_size, st_utime_t timeout) {
+    ssize_t rv = 0;
+    for (int i = 0; i < iov_size; i++) {
+        rv += st_write(fd, iov[i].iov_base, iov[i].iov_len, timeout);
+    }
+    return rv;
+}
+
+int st_writev_resid(_st_netfd_t* fd, struct iovec** iov, int* iov_size, st_utime_t timeout) {
+    ssize_t rv = st_writev(fd, iov, iov_size, timeout);
+    return rv > 0 ? 0 : -1;
 }
 
 // Simple I/O functions for UDP.
