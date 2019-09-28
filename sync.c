@@ -55,24 +55,25 @@ time_t st_time(void) {
 
 int st_usleep(st_utime_t usecs) {
     volatile _st_thread_t* me = _ST_CURRENT_THREAD();
-    if (me->flags & _ST_FL_INTERRUPT) {
-        me->flags &= ~_ST_FL_INTERRUPT;
-        errno = EINTR;
-        return -1;
-    }
+    if (me != NULL) {
+        if (me->flags & _ST_FL_INTERRUPT) {
+            me->flags &= ~_ST_FL_INTERRUPT;
+            errno = EINTR;
+            return -1;
+        }
+        if (usecs != ST_UTIME_NO_TIMEOUT) {
+            me->state = _ST_ST_SLEEPING;
+            _ST_ADD_SLEEPQ(me, usecs);
+        } else {
+            me->state = _ST_ST_SUSPENDED;
+        }
+        _ST_SWITCH_CONTEXT(me);
 
-    if (usecs != ST_UTIME_NO_TIMEOUT) {
-        me->state = _ST_ST_SLEEPING;
-        _ST_ADD_SLEEPQ(me, usecs);
-    } else {
-        me->state = _ST_ST_SUSPENDED;
-    }
-    _ST_SWITCH_CONTEXT(me);
-
-    if (me->flags & _ST_FL_INTERRUPT) {
-        me->flags &= ~_ST_FL_INTERRUPT;
-        errno = EINTR;
-        return -1;
+        if (me->flags & _ST_FL_INTERRUPT) {
+            me->flags &= ~_ST_FL_INTERRUPT;
+            errno = EINTR;
+            return -1;
+        }
     }
     return 0;
 }
@@ -103,6 +104,9 @@ int st_cond_destroy(_st_cond_t* cvar) {
 
 int st_cond_timedwait(_st_cond_t* cvar, st_utime_t timeout) {
     volatile _st_thread_t* me = _ST_CURRENT_THREAD();
+    if (me == NULL) {
+        return 0;
+    }
     int rv;
     if (me->flags & _ST_FL_INTERRUPT) {
         me->flags &= ~_ST_FL_INTERRUPT;
@@ -190,33 +194,35 @@ int st_mutex_destroy(_st_mutex_t* lock) {
 
 int st_mutex_lock(_st_mutex_t* lock) {
     volatile _st_thread_t* me = _ST_CURRENT_THREAD();
-    if (me->flags & _ST_FL_INTERRUPT) {
-        me->flags &= ~_ST_FL_INTERRUPT;
-        errno = EINTR;
-        return -1;
-    }
-    if (lock->owner == NULL) {
-        // Got the mutex
-        lock->owner = me;
-        return 0;
-    }
-    if (lock->owner == me) {
-        errno = EDEADLK;
-        return -1;
-    }
+    if (me != NULL) {
+        if (me->flags & _ST_FL_INTERRUPT) {
+            me->flags &= ~_ST_FL_INTERRUPT;
+            errno = EINTR;
+            return -1;
+        }
+        if (lock->owner == NULL) {
+            // Got the mutex
+            lock->owner = me;
+            return 0;
+        }
+        if (lock->owner == me) {
+            errno = EDEADLK;
+            return -1;
+        }
 
-    // Put caller thread on the mutex's wait queue
-    me->state = _ST_ST_LOCK_WAIT;
-    ST_APPEND_LINK(&me->wait_links, &lock->wait_q);
+        // Put caller thread on the mutex's wait queue
+        me->state = _ST_ST_LOCK_WAIT;
+        ST_APPEND_LINK(&me->wait_links, &lock->wait_q);
 
-    _ST_SWITCH_CONTEXT(me);
+        _ST_SWITCH_CONTEXT(me);
 
-    ST_REMOVE_LINK(&me->wait_links);
+        ST_REMOVE_LINK(&me->wait_links);
 
-    if ((me->flags & _ST_FL_INTERRUPT) && lock->owner != me) {
-        me->flags &= ~_ST_FL_INTERRUPT;
-        errno = EINTR;
-        return -1;
+        if ((me->flags & _ST_FL_INTERRUPT) && lock->owner != me) {
+            me->flags &= ~_ST_FL_INTERRUPT;
+            errno = EINTR;
+            return -1;
+        }
     }
     return 0;
 }

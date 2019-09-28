@@ -29,9 +29,6 @@ static WSADATA wsadata;
 // File descriptor object free list
 static _st_netfd_t* _st_netfd_freelist = NULL;
 
-// Maximum number of file descriptors that the process can open
-static int _st_osfd_limit = -1;
-
 static void _st_netfd_free_aux_data(_st_netfd_t* fd);
 
 int st_errno(void) {
@@ -129,13 +126,14 @@ int getpagesize(void) {
 }
 
 int _st_io_init(void) {
-    _st_osfd_limit = FD_SETSIZE;
-    WSAStartup(2, &wsadata);
+    
+    WORD wMakekey = MAKEWORD(2, 0);
+    WSAStartup(wMakekey, &wsadata);
+    if ((LOBYTE(wsadata.wVersion) != 2 || HIBYTE(wsadata.wVersion) != 0) &&
+        (LOBYTE(wsadata.wVersion) != 1 || HIBYTE(wsadata.wVersion) != 1)) {
+        WSACleanup();
+    }
     return 0;
-}
-
-int st_getfdlimit(void) {
-    return _st_osfd_limit;
 }
 
 void st_netfd_free(_st_netfd_t* fd) {

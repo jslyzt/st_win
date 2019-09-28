@@ -209,7 +209,6 @@ extern volatile _st_eventsys_t* _st_eventsys;
 
 #define _ST_VP_IDLE()   (*_st_eventsys->dispatch)()
 
-
 // vp queues operations
 #define _ST_ADD_IOQ(_pq)    ST_APPEND_LINK(&_pq.links, &_ST_IOQ)
 #define _ST_DEL_IOQ(_pq)    ST_REMOVE_LINK(&_pq.links)

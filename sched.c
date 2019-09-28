@@ -22,10 +22,14 @@ volatile st_utime_t _st_last_tset;       // Last time it was fetched
 
 
 int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
+    if (me == NULL) {
+        return 0;
+    }
+
     struct pollfd* pd;
     struct pollfd* epd = pds + npds;
     _st_pollq_t pq;
-    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
     int n;
 
     if (me->flags & _ST_FL_INTERRUPT) {
@@ -136,6 +140,10 @@ void _st_idle_thread_run() {
 
 void st_thread_exit(void* retval) {
     volatile _st_thread_t* thread = _ST_CURRENT_THREAD();
+    if (thread == NULL) {
+        return;
+    }
+
     thread->retval = retval;
     _st_thread_cleanup(thread);
     _st_active_count--;

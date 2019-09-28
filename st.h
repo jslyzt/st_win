@@ -41,7 +41,6 @@ typedef struct _st_mutex*   st_mutex_t;
 typedef struct _st_netfd*   st_netfd_t;
 
 int st_init(void);
-int st_getfdlimit(void);
 
 int st_set_eventsys(int eventsys);
 int st_get_eventsys(void);
