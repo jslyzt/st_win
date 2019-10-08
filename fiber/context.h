@@ -47,14 +47,20 @@ public:
         if (sg != this) {
             sg = this;
         }
-        SwitchToFiber(ctx_);
+        auto& ctx = FiberSG::GetTlsContext();
+        if (ctx != nullptr && ctx_ != nullptr) {
+            SwitchToFiber(ctx_);
+        }
     }
 
     static void SwapOut() {
         auto& sg = FiberSG::CurrentContext();
         if (sg != nullptr) {
             sg = nullptr;
-            SwitchToFiber(FiberSG::GetTlsContext());
+            auto& ctx = FiberSG::GetTlsContext();
+            if (ctx != nullptr) {
+                SwitchToFiber(ctx);
+            }
         }
     }
 

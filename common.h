@@ -22,6 +22,9 @@
 #include "st.h"
 #include "md.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Circular linked list definitions
 typedef struct _st_clist {
@@ -108,8 +111,8 @@ typedef struct _st_cond {
 typedef struct _st_thread _st_thread_t;
 
 struct _st_thread {
-    int state;                  // Thread's state
-    int flags;                  // Thread's flags
+    volatile int state;         // Thread's state
+    volatile int flags;         // Thread's flags
 
     void* (*start)(void* arg);  // The start function of the thread
     void* arg;                  // Argument of the start function
@@ -165,6 +168,7 @@ typedef struct _st_eventsys_ops {
 
 
 typedef struct _st_vp {
+    _st_thread_t* idle_thread;  // Idle thread for this vp
     st_utime_t last_clock;      // The last time we went into vp_check_clock()
 
     _st_clist_t run_q;          // run queue for this vp
@@ -223,14 +227,14 @@ extern volatile _st_eventsys_t* _st_eventsys;
 #define _ST_DEL_ZOMBIEQ(_thr)  ST_REMOVE_LINK(&(_thr)->links)
 
 // Thread states and flags
-#define _ST_ST_RUNNING      0
-#define _ST_ST_RUNNABLE     1
-#define _ST_ST_IO_WAIT      2
-#define _ST_ST_LOCK_WAIT    3
-#define _ST_ST_COND_WAIT    4
-#define _ST_ST_SLEEPING     5
-#define _ST_ST_ZOMBIE       6
-#define _ST_ST_SUSPENDED    7
+#define _ST_ST_RUNNING      0   // 运行中
+#define _ST_ST_RUNNABLE     1   // 可运行
+#define _ST_ST_IO_WAIT      2   // io等待
+#define _ST_ST_LOCK_WAIT    3   // io锁
+#define _ST_ST_COND_WAIT    4   // io条件
+#define _ST_ST_SLEEPING     5   // sleep
+#define _ST_ST_ZOMBIE       6   // 结束
+#define _ST_ST_SUSPENDED    7   // 暂停
 
 #define _ST_FL_PRIMORDIAL   0x01
 #define _ST_FL_IDLE_THREAD  0x02
@@ -282,6 +286,7 @@ extern volatile _st_eventsys_t* _st_eventsys;
 void _st_vp_schedule(void);
 void _st_vp_check_clock(void);
 void _st_idle_thread_run();
+void _st_idle_thread_start();
 void _st_thread_cleanup(volatile _st_thread_t* thread);
 void _st_add_sleep_q(volatile _st_thread_t* thread, st_utime_t timeout);
 void _st_del_sleep_q(volatile _st_thread_t* thread);
@@ -298,3 +303,7 @@ ssize_t st_read(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout);
 ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t timeout);
 int st_poll(struct pollfd* pds, int npds, st_utime_t timeout);
 _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinable, int stk_size);
+
+#ifdef __cplusplus
+}
+#endif

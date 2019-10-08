@@ -188,13 +188,17 @@ _st_netfd_t* st_netfd_open_socket(int osfd) {
 }
 
 int st_netfd_close(_st_netfd_t* fd) {
-    if ((*_st_eventsys->fd_close)(fd->osfd) < 0) {
-        return -1;
+    if (fd != NULL) {
+        if ((*_st_eventsys->fd_close)(fd->osfd) < 0) {
+            return -1;
+        }
+        st_netfd_free(fd);
+        if (fd->osfd > 0) {
+            _close(fd->osfd);
+            return _st_GetError(0);
+        }
     }
-    st_netfd_free(fd);
-    _close(fd->osfd);
-    errno = _st_GetError(0);
-    return errno;
+    return 0;
 }
 
 int st_netfd_fileno(_st_netfd_t* fd) {

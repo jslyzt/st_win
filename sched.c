@@ -81,15 +81,22 @@ void _st_vp_schedule(void) {
     if (_ST_RUNQ.next != &_ST_RUNQ) {
         thread = _ST_THREAD_PTR(_ST_RUNQ.next);
         _ST_DEL_RUNQ(thread);
+    } else {
+        thread = _st_this_vp.idle_thread;
     }
     if (thread == NULL || thread->state != _ST_ST_RUNNABLE) {
         return;
     }
-    // Resume the thread
-    thread->state = _ST_ST_RUNNING;
-    _ST_SET_CURRENT_THREAD(thread);
-    if (thread->context != NULL) {
-        swapFiber(thread->context);
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
+    if (me == thread) {
+        swapOutFiber();
+    } else {
+        // Resume the thread
+        thread->state = _ST_ST_RUNNING;
+        _ST_SET_CURRENT_THREAD(thread);
+        if (thread->context != NULL) {
+            swapFiber(thread->context);
+        }
     }
 }
 
@@ -117,6 +124,15 @@ int st_init(void) {
     _st_this_vp.pagesize = getpagesize();
     _st_this_vp.last_clock = st_utime();
 
+    // Create idle thread
+    _st_this_vp.idle_thread = st_thread_create(_st_idle_thread_start, NULL, 0, 0);
+    if (!_st_this_vp.idle_thread) {
+        return -1;
+    }
+    _st_this_vp.idle_thread->flags = _ST_FL_IDLE_THREAD;
+    _st_active_count--;
+    _ST_DEL_RUNQ(_st_this_vp.idle_thread);
+
     return 0;
 }
 
@@ -138,6 +154,29 @@ void _st_idle_thread_run() {
     delFiberSG(sg);
 }
 
+void _st_idle_thread_start() {
+    volatile _st_thread_t* me = _ST_CURRENT_THREAD();
+    while (_st_active_count > 0) {
+        /* Idle vp till I/O is ready or the smallest timeout expired */
+        _ST_VP_IDLE();
+
+        /* Check sleep queue for expired threads */
+        _st_vp_check_clock();
+
+        if (me != NULL && me->state != _ST_ST_ZOMBIE && me->state != _ST_ST_RUNNABLE) {
+            me->state = _ST_ST_RUNNABLE;
+        }
+        if (_st_active_count <= 0) {
+            break;
+        }
+        _st_vp_schedule();
+    }
+}
+
+int st_active_count() {
+    return _st_active_count;
+}
+
 void st_thread_exit(void* retval) {
     volatile _st_thread_t* thread = _ST_CURRENT_THREAD();
     if (thread == NULL) {
@@ -147,9 +186,10 @@ void st_thread_exit(void* retval) {
     thread->retval = retval;
     _st_thread_cleanup(thread);
     _st_active_count--;
+
+    thread->state = _ST_ST_ZOMBIE;
     if (thread->term) {
         // Put thread on the zombie queue
-        thread->state = _ST_ST_ZOMBIE;
         _ST_ADD_ZOMBIEQ(thread);
 
         // Notify on our termination condition variable
@@ -344,8 +384,9 @@ void _st_vp_check_clock(void) {
     while (_ST_SLEEPQ != NULL) {
         thread = _ST_SLEEPQ;
         ST_ASSERT(thread->flags & _ST_FL_ON_SLEEPQ);
-        if (thread->due > now)
+        if (thread->due > now) {
             break;
+        }
         _ST_DEL_SLEEPQ(thread);
 
         // If thread is waiting on condition variable, set the time out flag

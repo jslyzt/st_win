@@ -15,6 +15,8 @@
 #include <WinSock2.h>
 #endif
 #include "st.h"
+#include "common.h"
+#include "fiber/fiber.h"
 #include <iostream>
 
 void* do_resolve(void* ptr) {
@@ -43,6 +45,8 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
+    auto sg = createFiberSG();
+
     for (i = 1; i < argc; i++) {
         // Create a separate thread for each host name
         if (st_thread_create(do_resolve, argv[i], 0, 0) == nullptr) {
@@ -51,7 +55,11 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    st_idle_thread_run();
+    while (st_active_count() > 0) {
+        st_usleep(1);
+    }
+
+    delFiberSG(sg);
 
     return 1;
 }

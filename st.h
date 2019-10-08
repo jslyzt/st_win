@@ -72,6 +72,7 @@ int st_mutex_destroy(st_mutex_t lock);
 int st_mutex_lock(st_mutex_t lock);
 int st_mutex_unlock(st_mutex_t lock);
 int st_mutex_trylock(st_mutex_t lock);
+int st_active_count();
 
 int st_key_create(int* keyp, void (*destructor)(void*));
 int st_key_getlimit(void);
