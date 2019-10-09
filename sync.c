@@ -56,34 +56,21 @@ time_t st_time(void) {
 int st_usleep(st_utime_t usecs) {
     volatile _st_thread_t* me = _ST_CURRENT_THREAD();
     if (me != NULL && me->state != _ST_ST_ZOMBIE) {
-        do {
-            if (me->flags & _ST_FL_INTERRUPT) {
-                me->flags &= ~_ST_FL_INTERRUPT;
-                errno = EINTR;
-                return -1;
+        if (me->flags & _ST_FL_INTERRUPT) {
+            me->flags &= ~_ST_FL_INTERRUPT;
+            errno = EINTR;
+            return -1;
+        }
+        if (usecs != ST_UTIME_NO_TIMEOUT) {
+            if (me->state != _ST_ST_SLEEPING) {
+                me->state = _ST_ST_SLEEPING;
+                _ST_ADD_SLEEPQ(me, usecs);
             }
-            if (usecs != ST_UTIME_NO_TIMEOUT) {
-                if (me->state != _ST_ST_SLEEPING) {
-                    me->state = _ST_ST_SLEEPING;
-                    _ST_ADD_SLEEPQ(me, usecs);
-                } else {
-                    break;
-                }
-            } else {
-                if (me->state != _ST_ST_SUSPENDED) {
-                    me->state = _ST_ST_SUSPENDED;
-                } else {
-                    break;
-                }
+        } else {
+            if (me->state != _ST_ST_SUSPENDED) {
+                me->state = _ST_ST_SUSPENDED;
             }
-            _ST_SWITCH_CONTEXT(me);
-            if (me->flags & _ST_FL_INTERRUPT) {
-                me->flags &= ~_ST_FL_INTERRUPT;
-                errno = EINTR;
-                return -1;
-            }
-            return 0;
-        } while (0);
+        }
     }
     _st_vp_schedule();
     return 0;

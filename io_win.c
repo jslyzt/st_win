@@ -126,7 +126,7 @@ int getpagesize(void) {
 }
 
 int _st_io_init(void) {
-    
+
     WORD wMakekey = MAKEWORD(2, 0);
     WSAStartup(wMakekey, &wsadata);
     if ((LOBYTE(wsadata.wVersion) != 2 || HIBYTE(wsadata.wVersion) != 0) &&
@@ -137,7 +137,7 @@ int _st_io_init(void) {
 }
 
 void st_netfd_free(_st_netfd_t* fd) {
-    if (!fd->inuse) {
+    if (fd == NULL || !fd->inuse) {
         return;
     }
     fd->inuse = 0;
@@ -163,9 +163,9 @@ static _st_netfd_t* _st_netfd_new(int osfd, int nonblock, int is_socket) {
         _st_netfd_freelist = _st_netfd_freelist->next;
     } else {
         fd = calloc(1, sizeof(_st_netfd_t));
-        if (!fd) {
-            return NULL;
-        }
+    }
+    if (fd == NULL) {
+        return NULL;
     }
 
     fd->osfd = osfd;
@@ -180,10 +180,16 @@ static _st_netfd_t* _st_netfd_new(int osfd, int nonblock, int is_socket) {
 }
 
 _st_netfd_t* st_netfd_open(int osfd) {
+    if (osfd <= 0) {
+        return NULL;
+    }
     return _st_netfd_new(osfd, 1, 0);
 }
 
 _st_netfd_t* st_netfd_open_socket(int osfd) {
+    if (osfd <= 0) {
+        return NULL;
+    }
     return _st_netfd_new(osfd, 1, 1);
 }
 
@@ -194,7 +200,7 @@ int st_netfd_close(_st_netfd_t* fd) {
         }
         st_netfd_free(fd);
         if (fd->osfd > 0) {
-            _close(fd->osfd);
+            closesocket(fd->osfd);
             return _st_GetError(0);
         }
     }
@@ -202,10 +208,16 @@ int st_netfd_close(_st_netfd_t* fd) {
 }
 
 int st_netfd_fileno(_st_netfd_t* fd) {
+    if (fd == NULL) {
+        return 0;
+    }
     return (fd->osfd);
 }
 
 void st_netfd_setspecific(_st_netfd_t* fd, void* value, _st_destructor_t destructor) {
+    if (fd == NULL) {
+        return;
+    }
     if (value != fd->private_data) {
         // Free up previously set non-NULL data value
         if (fd->private_data && fd->destructor) {
@@ -217,12 +229,18 @@ void st_netfd_setspecific(_st_netfd_t* fd, void* value, _st_destructor_t destruc
 }
 
 void* st_netfd_getspecific(_st_netfd_t* fd) {
+    if (fd == NULL) {
+        return NULL;
+    }
     return (fd->private_data);
 }
 
 
 // Wait for I/O on a single descriptor.
 int st_netfd_poll(_st_netfd_t* fd, int how, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     struct pollfd pd;
     int n;
 
@@ -246,16 +264,23 @@ int st_netfd_poll(_st_netfd_t* fd, int how, st_utime_t timeout) {
 }
 
 int st_netfd_serialize_accept(_st_netfd_t* fd) {
-    fd->aux_data = NULL;
+    if (fd != NULL) {
+        fd->aux_data = NULL;
+    }
     return 0;
 }
 
 static void _st_netfd_free_aux_data(_st_netfd_t* fd) {
-    fd->aux_data = NULL;
+    if (fd != NULL) {
+        fd->aux_data = NULL;
+    }
 }
 
 _st_netfd_t* st_accept(_st_netfd_t* fd, struct sockaddr* addr, int* addrlen, st_utime_t timeout) {
-    SOCKET osfd;
+    if (fd == NULL) {
+        return NULL;
+    }
+    int osfd;
     _st_netfd_t* newfd;
 
     while ((osfd = accept(fd->osfd, addr, addrlen)) < 0) {
@@ -266,28 +291,36 @@ _st_netfd_t* st_accept(_st_netfd_t* fd, struct sockaddr* addr, int* addrlen, st_
         if (!_IO_NOT_READY_ERROR) {
             return NULL;
         }
+#ifndef WIN32
         // Wait until the socket becomes readable
         if (st_netfd_poll(fd, POLLIN, timeout) < 0) {
             return NULL;
         }
+#else
+        errno = ETIME;
+        return NULL;
+#endif
     }
 
     // On some platforms the new socket created by accept() inherits the nonblocking attribute of the listening socket
 #if defined (MD_ACCEPT_NB_INHERITED)
-    newfd = _st_netfd_new((int)osfd, 0, 1);
+    newfd = _st_netfd_new(osfd, 0, 1);
 #elif defined (MD_ACCEPT_NB_NOT_INHERITED)
-    newfd = _st_netfd_new((int)osfd, 1, 1);
+    newfd = _st_netfd_new(osfd, 1, 1);
 #else
 #error Unknown OS
 #endif
 
     if (!newfd) {
-        _close((int)osfd);
+        closesocket(osfd);
     }
     return newfd;
 }
 
 int st_connect(_st_netfd_t* fd, const struct sockaddr* addr, int addrlen, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     int n, err = 0;
 
     while (connect(fd->osfd, addr, addrlen) < 0) {
@@ -317,6 +350,9 @@ int st_connect(_st_netfd_t* fd, const struct sockaddr* addr, int addrlen, st_uti
 }
 
 ssize_t st_read(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     ssize_t n;
     while ((n = recv(fd->osfd, buf, (int)nbyte, 0)) < 0) {
         errno = _st_GetError(0);
@@ -335,6 +371,9 @@ ssize_t st_read(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout) {
 }
 
 ssize_t st_read_fully(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     ssize_t n;
     size_t nleft = nbyte;
 
@@ -363,6 +402,9 @@ ssize_t st_read_fully(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeo
 }
 
 int st_write_resid(_st_netfd_t* fd, const void* buf, size_t* resid, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     struct iovec iov, *riov;
     int riov_size, rv;
 
@@ -376,6 +418,9 @@ int st_write_resid(_st_netfd_t* fd, const void* buf, size_t* resid, st_utime_t t
 }
 
 ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     ssize_t n;
     size_t nleft = nbyte;
 
@@ -404,6 +449,9 @@ ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t time
 }
 
 ssize_t st_writev(_st_netfd_t* fd, const struct iovec* iov, int iov_size, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     ssize_t rv = 0;
     for (int i = 0; i < iov_size; i++) {
         rv += st_write(fd, iov[i].iov_base, iov[i].iov_len, timeout);
@@ -418,6 +466,9 @@ int st_writev_resid(_st_netfd_t* fd, struct iovec** iov, int* iov_size, st_utime
 
 // Simple I/O functions for UDP.
 int st_recvfrom(_st_netfd_t* fd, void* buf, int len, struct sockaddr* from, int* fromlen, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     int n;
     while ((n = recvfrom(fd->osfd, buf, len, 0, from, (socklen_t*)fromlen)) < 0) {
         errno = _st_GetError(0);
@@ -436,6 +487,9 @@ int st_recvfrom(_st_netfd_t* fd, void* buf, int len, struct sockaddr* from, int*
 }
 
 int st_sendto(_st_netfd_t* fd, const void* msg, int len, const struct sockaddr* to, int tolen, st_utime_t timeout) {
+    if (fd == NULL) {
+        return 0;
+    }
     int n;
     while ((n = sendto(fd->osfd, msg, len, 0, to, tolen)) < 0) {
         errno = _st_GetError(0);

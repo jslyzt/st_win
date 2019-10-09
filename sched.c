@@ -81,22 +81,23 @@ void _st_vp_schedule(void) {
     if (_ST_RUNQ.next != &_ST_RUNQ) {
         thread = _ST_THREAD_PTR(_ST_RUNQ.next);
         _ST_DEL_RUNQ(thread);
-    } else {
-        thread = _st_this_vp.idle_thread;
     }
     if (thread == NULL || thread->state != _ST_ST_RUNNABLE) {
-        return;
+        thread = _st_this_vp.idle_thread;
     }
     volatile _st_thread_t* me = _ST_CURRENT_THREAD();
-    if (me == thread) {
-        swapOutFiber();
-    } else {
-        // Resume the thread
-        thread->state = _ST_ST_RUNNING;
-        _ST_SET_CURRENT_THREAD(thread);
-        if (thread->context != NULL) {
-            swapFiber(thread->context);
-        }
+    if (me == thread && thread != _st_this_vp.idle_thread) {
+        _ST_ADD_RUNQ(thread);
+        thread = _st_this_vp.idle_thread;
+    }
+    if (thread == NULL) {
+        return;
+    }
+    // Resume the thread
+    thread->state = _ST_ST_RUNNING;
+    _ST_SET_CURRENT_THREAD(thread);
+    if (thread->context != NULL) {
+        swapFiber(thread->context);
     }
 }
 
@@ -154,7 +155,7 @@ void _st_idle_thread_run() {
     delFiberSG(sg);
 }
 
-void _st_idle_thread_start() {
+void* _st_idle_thread_start(void* ptr) {
     volatile _st_thread_t* me = _ST_CURRENT_THREAD();
     while (_st_active_count > 0) {
         /* Idle vp till I/O is ready or the smallest timeout expired */
@@ -171,6 +172,7 @@ void _st_idle_thread_start() {
         }
         _st_vp_schedule();
     }
+    return NULL;
 }
 
 int st_active_count() {
@@ -252,35 +254,46 @@ int st_thread_join(_st_thread_t* thread, void** retvalp) {
 // Insert "thread" into the timeout heap, in the position specified by thread->heap_index.
 // See docs/timeout_heap.txt for details about the timeout heap.
 static _st_thread_t** heap_insert(volatile _st_thread_t* thread) {
-    int target = thread->heap_index;
-    int s = target;
+    if (thread == NULL) {
+        return NULL;
+    }
     _st_thread_t** p = &_ST_SLEEPQ;
-    int bits = 0;
-    int bit;
-    int index = 1;
+    if (p == NULL) {
+        return NULL;
+    }
+    if (*p != NULL) {
+        int target = thread->heap_index;
+        int s = target;
+        int bits = 0;
+        int bit;
+        int index = 1;
 
-    while (s) {
-        s >>= 1;
-        bits++;
-    }
-    for (bit = bits - 2; bit >= 0; bit--) {
-        if (thread->due < (*p)->due) {
-            _st_thread_t* t = *p;
-            thread->left = t->left;
-            thread->right = t->right;
-            *p = thread;
-            thread->heap_index = index;
-            thread = t;
+        while (s) {
+            s >>= 1;
+            bits++;
         }
-        index <<= 1;
-        if (target & (1 << bit)) {
-            p = &((*p)->right);
-            index |= 1;
-        } else {
-            p = &((*p)->left);
+        for (bit = bits - 2; bit >= 0; bit--) {
+            if (thread->due < (*p)->due) {
+                _st_thread_t* t = *p;
+                thread->left = t->left;
+                thread->right = t->right;
+                *p = thread;
+                thread->heap_index = index;
+                thread = t;
+            }
+            index <<= 1;
+            if (target & (1 << bit)) {
+                p = &((*p)->right);
+                index |= 1;
+            } else {
+                p = &((*p)->left);
+            }
+            if (*p == NULL) {
+                break;
+            }
         }
+        thread->heap_index = index;
     }
-    thread->heap_index = index;
     *p = thread;
     thread->left = thread->right = NULL;
     return p;
@@ -301,8 +314,14 @@ static void heap_delete(volatile _st_thread_t* thread) {
     }
     for (bit = bits - 2; bit >= 0; bit--) {
         if (_ST_SLEEPQ_SIZE & (1 << bit)) {
+            if ((*p)->right == NULL) {
+                break;
+            }
             p = &((*p)->right);
         } else {
+            if ((*p)->left == NULL) {
+                break;
+            }
             p = &((*p)->left);
         }
     }
@@ -311,9 +330,17 @@ static void heap_delete(volatile _st_thread_t* thread) {
     --_ST_SLEEPQ_SIZE;
     if (t != thread) {
         // Insert the unlinked last element in place of the element we are deleting
-        t->heap_index = thread->heap_index;
+        if (t != NULL) {
+            t->heap_index = thread->heap_index;
+        }
         p = heap_insert(t);
+        if (p == NULL) {
+            return;
+        }
         t = *p;
+        if (t == NULL) {
+            return;
+        }
         t->left = thread->left;
         t->right = thread->right;
 
@@ -426,7 +453,8 @@ void _st_thread_main(intptr_t ptr) {
         thd->start(thd->arg);
     }
     st_thread_exit(thd->retval);
-    swapOutFiber();
+    //swapOutFiber();
+    _st_vp_schedule();
 }
 
 _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinable, int stk_size) {

@@ -25,6 +25,7 @@ static int _st_select_num = 0;
 static struct map_t* _st_select_fd_rmp = NULL;
 static struct map_t* _st_select_fd_wmp = NULL;
 static struct map_t* _st_select_fd_emp = NULL;
+static struct pair_t* _st_select_fd_pair = NULL;
 
 volatile _st_eventsys_t* _st_eventsys = NULL;
 
@@ -38,9 +39,8 @@ volatile _st_eventsys_t* _st_eventsys = NULL;
 #define _ST_SELECT_ADD_CNT(map, fd, val) \
     void* pos = map_at(map, fd); \
     if (pos == NULL) { \
-        pair_t* pair = create_pair(int, int); \
-        pair_make(pair, fd, val); \
-        map_insert(map, pair); \
+        pair_make(_st_select_fd_pair, fd, val); \
+        map_insert(map, _st_select_fd_pair); \
     } else { \
         *(int*)pos += val; \
     }
@@ -109,8 +109,13 @@ ST_HIDDEN void _st_select_check_seldata(int gfd) {
 // select event system
 ST_HIDDEN int _st_select_init(void) {
     _st_select_fd_rmp = create_map(int, int);
+    map_init(_st_select_fd_rmp);
     _st_select_fd_wmp = create_map(int, int);
+    map_init(_st_select_fd_wmp);
     _st_select_fd_emp = create_map(int, int);
+    map_init(_st_select_fd_emp);
+    _st_select_fd_pair = create_pair(int, int);
+    pair_init(_st_select_fd_pair);
     return 0;
 }
 

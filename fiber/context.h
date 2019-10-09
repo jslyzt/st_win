@@ -9,17 +9,34 @@
 # define thread_local __declspec(thread)
 #endif
 
+struct CtxTls {
+    void* native;
+    volatile int quote;
+};
+
 class Context;
 struct FiberScopedGuard {
     FiberScopedGuard::FiberScopedGuard() {
-        GetTlsContext() = ConvertThreadToFiber(nullptr);
+        auto& ctx = GetTlsContext();
+        if (ctx == nullptr) {
+            ctx = new CtxTls{ ConvertThreadToFiber(nullptr), 1};
+        } else {
+            ++ctx->quote;
+        }
     }
     FiberScopedGuard::~FiberScopedGuard() {
-        ConvertFiberToThread();
-        GetTlsContext() = nullptr;
+        auto& ctx = GetTlsContext();
+        if (ctx != nullptr) {
+            ctx->quote--;
+            if (ctx->quote <= 0) {
+                ConvertFiberToThread();
+                delete ctx;
+                ctx = nullptr;
+            }
+        }
     }
-    static void*& GetTlsContext() {
-        static thread_local void* native = nullptr;
+    static CtxTls*& GetTlsContext() {
+        static thread_local CtxTls* native = nullptr;
         return native;
     }
     static Context*& CurrentContext() {
@@ -48,7 +65,7 @@ public:
             sg = this;
         }
         auto& ctx = FiberSG::GetTlsContext();
-        if (ctx != nullptr && ctx_ != nullptr) {
+        if (ctx != nullptr && ctx->native != nullptr && ctx_ != nullptr) {
             SwitchToFiber(ctx_);
         }
     }
@@ -58,8 +75,8 @@ public:
         if (sg != nullptr) {
             sg = nullptr;
             auto& ctx = FiberSG::GetTlsContext();
-            if (ctx != nullptr) {
-                SwitchToFiber(ctx);
+            if (ctx != nullptr && ctx->native != nullptr) {
+                SwitchToFiber(ctx->native);
             }
         }
     }

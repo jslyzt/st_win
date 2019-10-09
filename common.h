@@ -37,7 +37,9 @@ typedef struct _st_clist {
     ST_BEGIN_MACRO \
     (_e)->next = (_l); \
     (_e)->prev = (_l)->prev; \
-    (_l)->prev->next = (_e); \
+    if((_l)->prev != NULL) { \
+        (_l)->prev->next = (_e); \
+    } \
     (_l)->prev = (_e); \
     ST_END_MACRO
 
@@ -46,7 +48,9 @@ typedef struct _st_clist {
     ST_BEGIN_MACRO \
     (_e)->next = (_l)->next; \
     (_e)->prev = (_l); \
-    (_l)->next->prev = (_e); \
+    if((_l)->next != NULL) { \
+        (_l)->next->prev = (_e); \
+    } \
     (_l)->next = (_e); \
     ST_END_MACRO
 
@@ -66,8 +70,12 @@ typedef struct _st_clist {
 // Remove the element "_e" from it's circular list
 #define ST_REMOVE_LINK(_e) \
     ST_BEGIN_MACRO \
-    (_e)->prev->next = (_e)->next; \
-    (_e)->next->prev = (_e)->prev; \
+    if((_e)->prev != NULL) { \
+        (_e)->prev->next = (_e)->next; \
+    } \
+    if ((_e)->next != NULL) { \
+        (_e)->next->prev = (_e)->prev; \
+    } \
     ST_END_MACRO
 
 // Return non-zero if the given circular list "_l" is empty, zero if the circular list is not empty
@@ -286,7 +294,7 @@ extern volatile _st_eventsys_t* _st_eventsys;
 void _st_vp_schedule(void);
 void _st_vp_check_clock(void);
 void _st_idle_thread_run();
-void _st_idle_thread_start();
+void* _st_idle_thread_start(void*);
 void _st_thread_cleanup(volatile _st_thread_t* thread);
 void _st_add_sleep_q(volatile _st_thread_t* thread, st_utime_t timeout);
 void _st_del_sleep_q(volatile _st_thread_t* thread);
