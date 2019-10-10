@@ -49,10 +49,13 @@ int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
     _ST_ADD_IOQ(pq);
     if (timeout != ST_UTIME_NO_TIMEOUT) {
         _ST_ADD_SLEEPQ(me, timeout);
-        _st_vp_schedule();
-        //_ST_SWITCH_CONTEXT(me);
+    } else {
+        _ST_ADD_SLEEPQ(me, 1);
     }
-    //me->state = _ST_ST_IO_WAIT;
+    me->state = _ST_ST_IO_WAIT;
+
+    _st_vp_schedule();
+    //_ST_SWITCH_CONTEXT(me);
 
     n = 0;
     if (pq.on_ioq) {
