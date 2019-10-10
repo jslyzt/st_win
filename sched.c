@@ -453,8 +453,8 @@ void _st_thread_main(intptr_t ptr) {
         thd->start(thd->arg);
     }
     st_thread_exit(thd->retval);
-    //swapOutFiber();
-    _st_vp_schedule();
+    swapOutFiber();
+    //_st_vp_schedule();
 }
 
 _st_thread_t* st_thread_create(void* (*start)(void* arg), void* arg, int joinable, int stk_size) {
