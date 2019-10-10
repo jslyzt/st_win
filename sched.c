@@ -52,7 +52,8 @@ int st_poll(struct pollfd* pds, int npds, st_utime_t timeout) {
     }
     me->state = _ST_ST_IO_WAIT;
 
-    _ST_SWITCH_CONTEXT(me);
+    _st_vp_schedule();
+    //_ST_SWITCH_CONTEXT(me);
 
     n = 0;
     if (pq.on_ioq) {
