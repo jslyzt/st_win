@@ -38,10 +38,13 @@ int st_errno(void) {
 // _st_GetError xlate winsock errors to unix
 int _st_GetError(int err) {
     int syserr;
-
-    if (err == 0) syserr = GetLastError();
+    if (err == 0) {
+        syserr = GetLastError();
+    }
     SetLastError(0);
-    if (syserr < WSABASEERR) return (syserr);
+    if (syserr < WSABASEERR) {
+        return syserr;
+    }
     switch (syserr) {
         case WSAEINTR:
             syserr = EINTR;
@@ -116,7 +119,7 @@ int _st_GetError(int err) {
             syserr = EHOSTUNREACH;
             break;
     }
-    return (syserr);
+    return syserr;
 }
 
 int getpagesize(void) {
@@ -252,9 +255,7 @@ int st_netfd_poll(_st_netfd_t* fd, int how, st_utime_t timeout) {
         return -1;
     }
     if (n == 0) {
-        // Timed out
-        errno = ETIME;
-        return -1;
+        return 0;
     }
     if (pd.revents & POLLNVAL) {
         errno = EBADF;
@@ -280,7 +281,7 @@ _st_netfd_t* st_accept(_st_netfd_t* fd, struct sockaddr* addr, int* addrlen, st_
     if (fd == NULL) {
         return NULL;
     }
-    int osfd;
+    int osfd = 0;
     _st_netfd_t* newfd;
 
     while ((osfd = accept(fd->osfd, addr, addrlen)) < 0) {
@@ -325,6 +326,9 @@ int st_connect(_st_netfd_t* fd, const struct sockaddr* addr, int addrlen, st_uti
 
     while (connect(fd->osfd, addr, addrlen) < 0) {
         errno = _st_GetError(0);
+        if (errno == EAGAIN) {
+            continue;
+        }
         if (errno != EINTR) {
             if (errno != EAGAIN && errno != EINTR) {
                 return -1;
@@ -354,13 +358,14 @@ ssize_t st_read(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout) {
         return 0;
     }
     ssize_t n;
+
     while ((n = recv(fd->osfd, buf, (int)nbyte, 0)) < 0) {
         errno = _st_GetError(0);
         if (errno == EINTR) {
             continue;
         }
         if (!_IO_NOT_READY_ERROR) {
-            return (-1);
+            return -1;
         }
         // Wait until the socket becomes readable
         if (st_netfd_poll(fd, POLLIN, timeout) < 0) {
@@ -470,6 +475,7 @@ int st_recvfrom(_st_netfd_t* fd, void* buf, int len, struct sockaddr* from, int*
         return 0;
     }
     int n;
+
     while ((n = recvfrom(fd->osfd, buf, len, 0, from, (socklen_t*)fromlen)) < 0) {
         errno = _st_GetError(0);
         if (errno == EINTR) {
@@ -491,6 +497,7 @@ int st_sendto(_st_netfd_t* fd, const void* msg, int len, const struct sockaddr* 
         return 0;
     }
     int n;
+
     while ((n = sendto(fd->osfd, msg, len, 0, to, tolen)) < 0) {
         errno = _st_GetError(0);
         if (errno == EINTR) {
