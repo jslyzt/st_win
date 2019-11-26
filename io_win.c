@@ -285,8 +285,9 @@ _st_netfd_t* st_accept(_st_netfd_t* fd, struct sockaddr* addr, int* addrlen, st_
     _st_netfd_t* newfd;
 
     while ((osfd = accept(fd->osfd, addr, addrlen)) < 0) {
-        errno = _st_GetError(0);
-        if (errno == EINTR) {
+        auto ecode = _st_GetError(0);
+        errno = ecode;
+        if (ecode == EINTR) {
             continue;
         }
         if (!_IO_NOT_READY_ERROR) {
@@ -325,12 +326,16 @@ int st_connect(_st_netfd_t* fd, const struct sockaddr* addr, int addrlen, st_uti
     int n, err = 0;
 
     while (connect(fd->osfd, addr, addrlen) < 0) {
-        errno = _st_GetError(0);
-        if (errno == EAGAIN) {
+        auto ecode = _st_GetError(0);
+        errno = ecode;
+        if (ecode == EAGAIN) {
             continue;
         }
-        if (errno != EINTR) {
-            if (errno != EAGAIN && errno != EINTR) {
+        if (ecode == EISCONN) {
+            break;
+        }
+        if (ecode != EINTR) {
+            if (ecode != EAGAIN && ecode != EINTR) {
                 return -1;
             }
             // Wait until the socket becomes writable
@@ -360,8 +365,9 @@ ssize_t st_read(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeout) {
     ssize_t n;
 
     while ((n = recv(fd->osfd, buf, (int)nbyte, 0)) < 0) {
-        errno = _st_GetError(0);
-        if (errno == EINTR) {
+        auto ecode = _st_GetError(0);
+        errno = ecode;
+        if (ecode == EINTR) {
             continue;
         }
         if (!_IO_NOT_READY_ERROR) {
@@ -384,8 +390,9 @@ ssize_t st_read_fully(_st_netfd_t* fd, void* buf, size_t nbyte, st_utime_t timeo
 
     while (nleft > 0) {
         if ((n = recv(fd->osfd, buf, (int)nleft, 0)) < 0) {
-            errno = _st_GetError(0);
-            if (errno == EINTR) {
+            auto ecode = _st_GetError(0);
+            errno = ecode;
+            if (ecode == EINTR) {
                 continue;
             }
             if (!_IO_NOT_READY_ERROR) {
@@ -431,8 +438,9 @@ ssize_t st_write(_st_netfd_t* fd, const void* buf, size_t nbyte, st_utime_t time
 
     while (nleft > 0) {
         if ((n = send(fd->osfd, buf, (int)nleft, 0)) < 0) {
-            errno = _st_GetError(0);
-            if (errno == EINTR) {
+            auto ecode = _st_GetError(0);
+            errno = ecode;
+            if (ecode == EINTR) {
                 continue;
             }
             if (!_IO_NOT_READY_ERROR) {
@@ -477,8 +485,9 @@ int st_recvfrom(_st_netfd_t* fd, void* buf, int len, struct sockaddr* from, int*
     int n;
 
     while ((n = recvfrom(fd->osfd, buf, len, 0, from, (socklen_t*)fromlen)) < 0) {
-        errno = _st_GetError(0);
-        if (errno == EINTR) {
+        auto ecode = _st_GetError(0);
+        errno = ecode;
+        if (ecode == EINTR) {
             continue;
         }
         if (!_IO_NOT_READY_ERROR) {
@@ -499,8 +508,9 @@ int st_sendto(_st_netfd_t* fd, const void* msg, int len, const struct sockaddr* 
     int n;
 
     while ((n = sendto(fd->osfd, msg, len, 0, to, tolen)) < 0) {
-        errno = _st_GetError(0);
-        if (errno == EINTR) {
+        auto ecode = _st_GetError(0);
+        errno = ecode;
+        if (ecode == EINTR) {
             continue;
         }
         if (!_IO_NOT_READY_ERROR) {
@@ -519,15 +529,17 @@ _st_netfd_t* st_open(const char* path, int oflags, mode_t mode) {
     int osfd, err;
     _st_netfd_t* newfd;
     while ((osfd = _open(path, oflags, mode)) < 0) {
-        errno = _st_GetError(0);
-        if (errno != EINTR) {
+        auto ecode = _st_GetError(0);
+        errno = ecode;
+        if (ecode != EINTR) {
             return NULL;
         }
     }
     newfd = _st_netfd_new(osfd, 0, 0);
     if (!newfd) {
-        errno = _st_GetError(0);
-        err = errno;
+        auto ecode = _st_GetError(0);
+        errno = ecode;
+        err = ecode;
         _close(osfd);
         errno = err;
     }
